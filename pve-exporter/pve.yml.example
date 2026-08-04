@@ -1,0 +1,7 @@
+# Copy to pve.yml. Prefer API tokens over passwords.
+default:
+  user: monitoring@pve
+  # token_name: monitoring
+  # token_value: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  password: CHANGE_ME
+  verify_ssl: true

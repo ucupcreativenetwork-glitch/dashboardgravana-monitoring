@@ -1,0 +1,9 @@
+{{ define "telegram.message" }}
+{{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} <b>{{ .CommonLabels.severity | toUpper }}</b>
+{{ .CommonAnnotations.summary }}
+
+{{ range .Alerts }}
+<b>Instance:</b> <code>{{ .Labels.instance }}</code>
+{{ .Annotations.description }}
+{{ end }}
+{{ end }}
