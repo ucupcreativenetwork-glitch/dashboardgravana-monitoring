@@ -1,0 +1,113 @@
+# =============================================================================
+# Alertmanager Configuration — DashboardGravana
+# Production routing, grouping, inhibition, and multi-channel notifications.
+#
+# Channels: Discord (primary), Telegram, Email, Webhook
+# Severity: warning → critical → emergency
+# =============================================================================
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: '${ALERTMANAGER_SMTP_SMARTHOST}'
+  smtp_from: '${ALERTMANAGER_SMTP_FROM}'
+  smtp_auth_username: '${ALERTMANAGER_SMTP_AUTH_USERNAME}'
+  smtp_auth_password: '${ALERTMANAGER_SMTP_AUTH_PASSWORD}'
+  smtp_require_tls: true
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+route:
+  receiver: 'discord-default'
+  group_by: ['alertname', 'severity', 'cluster', 'instance']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    # Emergency — immediate, no grouping delay
+    - match:
+        severity: emergency
+      receiver: 'discord-emergency'
+      group_wait: 0s
+      repeat_interval: 15m
+      continue: true
+
+    # Critical
+    - match:
+        severity: critical
+      receiver: 'discord-critical'
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: true
+
+    # Warning
+    - match:
+        severity: warning
+      receiver: 'discord-warning'
+      group_wait: 1m
+      repeat_interval: 6h
+
+    # Team-based routing examples
+    - match:
+        team: security
+      receiver: 'discord-security'
+      continue: true
+
+inhibit_rules:
+  # Critical inhibits warning for same alertname + instance
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname', 'instance']
+
+  - source_match:
+      severity: emergency
+    target_match_re:
+      severity: 'critical|warning'
+    equal: ['alertname', 'instance']
+
+  # NodeDown inhibits all other alerts from that instance
+  - source_match:
+      alertname: NodeDown
+    target_match_re:
+      alertname: '.+'
+    equal: ['instance']
+
+receivers:
+  - name: 'discord-default'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+
+  - name: 'discord-warning'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+
+  - name: 'discord-critical'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+
+  - name: 'discord-emergency'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+
+  - name: 'discord-security'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+
+  - name: 'null'
