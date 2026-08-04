@@ -6,6 +6,15 @@ Similar in capability to Datadog, Zabbix, PRTG, Grafana Cloud, Prometheus Operat
 
 ---
 
+## Documentation
+
+- **[Manual Book](docs/MANUAL.md)** — installation, configuration, operations, troubleshooting, FAQ
+- **[Full Manual (single file)](docs/MANUAL-FULL.md)** — complete handbook in one document
+- [Architecture](docs/ARCHITECTURE.md)
+- [Runbooks](docs/runbooks/)
+
+---
+
 ## Architecture
 
 ```
@@ -29,16 +38,7 @@ Similar in capability to Datadog, Zabbix, PRTG, Grafana Cloud, Prometheus Operat
         │         Discord / Telegram / Email │
         │                                    │
 ┌───────▼────────────────────────────────────┴──────────┐
-│  Exporters & Agents                                    │
-│  node-exporter · cAdvisor · blackbox · pve-exporter    │
-│  Promtail (Docker / journal / syslog / nginx)          │
-│  MySQL / Redis / Nextcloud / custom exporters          │
-└────────────────────────────────────────────────────────┘
-        │
-┌───────▼────────────────────────────────────────────────┐
-│  Targets: Linux · Windows · Docker · Proxmox · VMs     │
-│  LXC · NAS · UPS · pfSense · Mikrotik · Cloudflare     │
-│  Nextcloud · Immich · Shinobi · MariaDB · Redis        │
+│  Exporters: node · cAdvisor · blackbox · pve · Promtail│
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -46,15 +46,13 @@ Similar in capability to Datadog, Zabbix, PRTG, Grafana Cloud, Prometheus Operat
 
 | Decision | Rationale |
 |----------|-----------|
-| Docker Compose first | Fastest path to production for HomeLab/SMB; clear path to K8s (Helm later) |
-| Single Prometheus | Simple ops; federation + remote_write ready for multi-node / HA |
-| Loki single-binary | Sufficient for most sites; migrate to microservices when needed |
-| Alertmanager clustering prepared | `--cluster.listen-address` already set |
-| Recording rules | Keep dashboards fast and reduce query load |
-| Severity + inhibition | Reduce alert noise in production |
-| Secrets via `.env` | Simple; migrate to Vault / Docker secrets for multi-tenant |
-| Resource limits | Protect the monitoring host itself |
-| Healthchecks | Compose restarts only unhealthy containers |
+| Docker Compose first | Fastest path to production; clear path to K8s later |
+| Single Prometheus | Simple ops; federation + remote_write ready |
+| Loki single-binary | Sufficient for most sites |
+| Alertmanager clustering prepared | HA-ready flags |
+| Recording rules | Fast dashboards, lower query load |
+| Secrets via `.env` | Simple; migrate to Vault when needed |
+| Resource limits + healthchecks | Protect the monitoring host |
 
 ---
 
@@ -62,10 +60,8 @@ Similar in capability to Datadog, Zabbix, PRTG, Grafana Cloud, Prometheus Operat
 
 - Ubuntu Server 24.04 LTS (recommended), Debian 12, or Proxmox VE host
 - Docker Engine 24+ and Docker Compose v2 plugin
-- Minimum 4 CPU / 8 GB RAM / 50 GB SSD for a small environment
+- Minimum 4 CPU / 8 GB RAM / 50 GB SSD
 - Recommended 8+ CPU / 16–32 GB RAM / 200+ GB for medium–large
-- Outbound HTTPS for Discord / Telegram / image pulls
-- (Optional) SMTP for email alerts
 
 ---
 
@@ -75,191 +71,116 @@ Similar in capability to Datadog, Zabbix, PRTG, Grafana Cloud, Prometheus Operat
 git clone https://github.com/ucupcreativenetwork-glitch/dashboardgravana-monitoring.git
 cd dashboardgravana-monitoring
 
-# One-shot install (Docker + env + directories)
 sudo ./scripts/install.sh
-
-# Edit secrets
 cp .env.example .env
 nano .env   # set GF_SECURITY_ADMIN_PASSWORD, DISCORD_WEBHOOK_URL, etc.
 
-# Launch
 sudo ./scripts/install.sh --start
-# or
-docker compose up -d
+# or: docker compose up -d
 ```
 
-Access:
+| Service | Default URL |
+|---------|-------------|
+| Grafana | http://localhost:3000 |
+| Prometheus | http://localhost:9090 |
+| Alertmanager | http://localhost:9093 |
+| Uptime Kuma | http://localhost:3001 |
+| Loki | http://localhost:3100 |
 
-| Service       | Default URL                  |
-|---------------|------------------------------|
-| Grafana       | http://localhost:3000        |
-| Prometheus    | http://localhost:9090        |
-| Alertmanager  | http://localhost:9093        |
-| Uptime Kuma   | http://localhost:3001        |
-| Loki          | http://localhost:3100        |
+Credentials: from `.env`. Full steps: **[Manual Book](docs/MANUAL.md)**.
 
-Default Grafana credentials come from `.env` (`GF_SECURITY_ADMIN_USER` / `GF_SECURITY_ADMIN_PASSWORD`).
+---
+
+## Dashboards
+
+**35 production dashboards** auto-provisioned under `grafana/dashboards/`.
+
+| Range | Coverage |
+|-------|----------|
+| 01–05 | Executive, Infrastructure, Linux, Docker, Container |
+| 06–09 | Proxmox Cluster/Node, VMs, LXC |
+| 10–13 | Storage, Network, Bandwidth, Internet/Probes |
+| 14–19 | Application, Nextcloud, Immich, MariaDB, Redis, Shinobi |
+| 20–26 | Alert Center, Security, SSL, Cloudflare, pfSense, Mikrotik, UPS |
+| 27–31 | Temperature, SMART, Backup, Logs, Audit |
+| 32–35 | Performance, Capacity, Business, Datacenter |
+
+Details: [docs/manual/04-dashboards.md](docs/manual/04-dashboards.md).
 
 ---
 
 ## Configuration
 
-### Environment
+Driven by `.env` (see `.env.example`). Critical: `GF_SECURITY_ADMIN_PASSWORD`, `DISCORD_WEBHOOK_URL`, optional Telegram/SMTP/PVE vars.
 
-All runtime configuration is driven by `.env`. See `.env.example` for the full list and comments.
-
-Critical variables:
-
-- `GF_SECURITY_ADMIN_PASSWORD` — **required**
-- `DISCORD_WEBHOOK_URL` — primary notification channel
-- `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — optional
-- `PROMETHEUS_RETENTION_TIME` / `PROMETHEUS_RETENTION_SIZE`
-- `PVE_*` — when enabling Proxmox exporter
-
-### Adding scrape targets
-
-Edit `prometheus/prometheus.yml` or (preferred for multi-node) enable `file_sd_configs` and drop JSON files under `prometheus/targets/`.
-
-Example `prometheus/targets/nodes.json`:
-
-```json
-[
-  {
-    "targets": ["192.168.1.10:9100", "192.168.1.11:9100"],
-    "labels": { "env": "prod", "role": "compute" }
-  }
-]
-```
-
-### Enabling Proxmox monitoring
-
-1. Create a dedicated Proxmox user / API token with PVEAuditor (or minimal monitoring rights).
-2. Uncomment the `pve-exporter` service in `docker-compose.yml`.
-3. Create `pve-exporter/pve.yml` and set `PVE_*` in `.env`.
-4. Uncomment the `pve` job in `prometheus/prometheus.yml`.
-
-### Dashboards
-
-Dashboards live under `grafana/dashboards/` and are auto-provisioned.
-
-Current ship list (expanding):
-
-| #  | Dashboard              | UID                     |
-|----|------------------------|-------------------------|
-| 01 | Executive Overview     | dg-executive-overview   |
-| 02 | Infrastructure Overview| (planned)               |
-| 03 | Linux Overview         | (planned)               |
-| …  | …                      | …                       |
-| 20 | Alert Center           | (planned)               |
-| 30 | Logs                   | (planned)               |
-
-All dashboards use dark theme, variables, thresholds and navigation links.
-
-### Alerts
-
-Rules are split by domain:
-
-- `prometheus/rules/infrastructure.yml` — node, CPU, RAM, disk, filesystem
-- `prometheus/rules/containers.yml` — Docker / cAdvisor
-- `prometheus/rules/application.yml` — probes, SSL, stack health
-
-Alertmanager routes by `severity` and `team`, with inhibition to suppress noise.
+Adding targets: prefer `prometheus/targets/*.json` with file_sd. Proxmox: see [Manual ch.06](docs/manual/06-exporters-proxmox-notifications.md).
 
 ---
 
 ## Backup & Restore
 
 ```bash
-./scripts/backup.sh          # config + volume snapshots
+./scripts/backup.sh
 ./scripts/restore.sh <archive.tar.gz>
 ```
-
-Store backups off-box. Test restore periodically (disaster recovery).
 
 ---
 
 ## Security
 
-See [SECURITY.md](SECURITY.md).
-
-Summary:
-
-- Never commit `.env`
-- TLS at the edge (reverse proxy)
-- Disable anonymous Grafana access
-- Least-privilege exporter credentials
-- Keep images patched (Dependabot enabled)
+See [SECURITY.md](SECURITY.md). Never commit `.env`. TLS at the edge. Least-privilege exporters.
 
 ---
 
 ## Scaling & HA
 
-| Stage        | Approach                                      |
-|--------------|-----------------------------------------------|
-| Single node  | Current Compose stack                         |
-| Multi-node   | Federation + file_sd / HTTP SD                |
-| Long-term    | remote_write → Thanos / Mimir / Grafana Cloud |
-| Logs scale   | Loki distributed (object storage)             |
-| K8s          | Migrate to Helm charts (roadmap)              |
-
-Alertmanager is already started with clustering flags.
+Federation, remote_write (Thanos/Mimir), Loki object storage, Helm (roadmap). Alertmanager clustering flags already set.
 
 ---
 
 ## Upgrade
 
 ```bash
-git pull
-docker compose pull
-docker compose up -d
+git pull && docker compose pull && docker compose up -d
 ```
-
-Check CHANGELOG.md for breaking changes. Prefer blue/green or maintenance windows for major Prometheus / Grafana major versions.
 
 ---
 
 ## Troubleshooting
 
-| Symptom                    | Check                                      |
-|----------------------------|--------------------------------------------|
-| Grafana empty dashboards   | Prometheus targets up? Recording rules?    |
-| No alerts in Discord       | `DISCORD_WEBHOOK_URL`, Alertmanager logs   |
-| Node metrics missing       | node-exporter reachable, firewall          |
-| High disk use              | Retention settings, Loki retention         |
-| cAdvisor permission errors | Privileged + host mounts (documented)      |
+| Symptom | Check |
+|---------|-------|
+| Empty Grafana panels | Prometheus targets / recording rules |
+| No Discord alerts | Webhook URL, Alertmanager logs |
+| Node metrics missing | node-exporter, firewall |
 
 ```bash
-docker compose logs -f grafana prometheus alertmanager loki
-docker compose ps
+docker compose logs -f grafana prometheus alertmanager
 curl -s localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job, health}'
 ```
+
+Full guide: [ch.08](docs/manual/08-operations-faq.md).
 
 ---
 
 ## Roadmap
 
-- [ ] Full set of 35 enterprise dashboards
-- [ ] PVE / Mikrotik / pfSense / UPS exporters fully wired
-- [ ] Nextcloud, Immich, Shinobi, MariaDB, Redis dashboards + alerts
-- [ ] Cloudflare analytics exporter
-- [ ] SMART / temperature panels
+- [x] Full set of 35 enterprise dashboards
+- [x] Manual Book (operations handbook)
+- [ ] Exporters fully wired (PVE / edge network / UPS)
 - [ ] Helm chart + Kubernetes manifests
 - [ ] Thanos / Mimir optional profile
-- [ ] Ansible / Terraform deployment modules
+- [ ] Ansible / Terraform modules
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). PRs that add production-ready dashboards, exporters or runbooks are especially welcome.
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
----
 
 ## Maintainers
 
