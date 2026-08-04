@@ -1,0 +1,90 @@
+# =============================================================================
+# Application, SSL, Network, Backup related alerts
+# =============================================================================
+
+groups:
+  - name: application.availability
+    interval: 30s
+    rules:
+      - alert: ProbeHTTPFailure
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "HTTP probe failed for {{ $labels.instance }}"
+          description: "Blackbox HTTP probe to {{ $labels.instance }} is failing."
+
+      - alert: ProbeHighLatency
+        expr: probe_duration_seconds{job="blackbox-http"} > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "High latency to {{ $labels.instance }}"
+          description: "Probe duration {{ $value | printf \"%.2f\" }}s."
+
+      - alert: ProbePacketLoss
+        expr: probe_success{job="blackbox-icmp"} == 0
+        for: 3m
+        labels:
+          severity: warning
+          team: network
+        annotations:
+          summary: "ICMP probe failed to {{ $labels.instance }}"
+          description: "Possible packet loss or host unreachable."
+
+      - alert: SSLCertExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "SSL certificate expiring soon for {{ $labels.instance }}"
+          description: "Certificate expires in {{ $value | printf \"%.0f\" }} days."
+
+      - alert: SSLCertExpired
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 0
+        for: 5m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "SSL certificate EXPIRED for {{ $labels.instance }}"
+          description: "Immediate renewal required."
+
+  - name: monitoring.stack
+    interval: 30s
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 3m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "Prometheus target down: {{ $labels.job }} / {{ $labels.instance }}"
+          description: "Scrape target has been down for 3 minutes."
+
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana health check failed."
+
+      - alert: LokiDown
+        expr: up{job="loki"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "Loki is down"
+          description: "Log aggregation unavailable."

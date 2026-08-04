@@ -1,0 +1,57 @@
+# =============================================================================
+# Container & Docker Alert Rules
+# =============================================================================
+
+groups:
+  - name: containers.docker
+    interval: 30s
+    rules:
+      - alert: ContainerDown
+        expr: time() - container_last_seen{name!=""} > 60
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Container {{ $labels.name }} disappeared"
+          description: "Container {{ $labels.name }} on {{ $labels.instance }} has not been seen for >60s."
+
+      - alert: ContainerHighCPU
+        expr: (rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High CPU in container {{ $labels.name }}"
+          description: "CPU usage {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}."
+
+      - alert: ContainerHighMemory
+        expr: (container_memory_working_set_bytes{name!=""} / container_spec_memory_limit_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory in container {{ $labels.name }}"
+          description: "Working set is {{ $value | printf \"%.1f\" }}% of limit."
+
+      - alert: ContainerOOMKilled
+        expr: increase(container_oom_events_total{name!=""}[15m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "OOMKilled: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} was OOM killed."
+
+      - alert: ContainerRestarting
+        expr: increase(kube_pod_container_status_restarts_total[15m]) > 3 or increase(container_start_time_seconds[15m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Frequent restarts for {{ $labels.name }}"
+          description: "Container is restarting frequently."
