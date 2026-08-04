@@ -1,0 +1,18 @@
+# =============================================================================
+# Grafana Dashboard Provisioning
+# All dashboards under /var/lib/grafana/dashboards are auto-loaded
+# =============================================================================
+apiVersion: 1
+
+providers:
+  - name: 'DashboardGravana'
+    orgId: 1
+    folder: 'DashboardGravana'
+    folderUid: dashboardgravana
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
