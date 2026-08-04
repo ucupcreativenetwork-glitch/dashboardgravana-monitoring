@@ -1,0 +1,186 @@
+# =============================================================================
+# Prometheus Configuration — DashboardGravana Monitoring Stack
+# Production-ready scrape configuration with multi-target support,
+# recording rules, alert rules, and federation readiness.
+#
+# Design principles:
+# - Explicit job labels for every target class
+# - Relabeling for consistent instance / job / environment labels
+# - File-based service discovery ready (targets/*.json)
+# - Support for future Kubernetes SD and federation
+# - Retention and remote_write controlled via command-line / env
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    cluster: dashboardgravana
+    environment: production
+    monitor: dashboardgravana-stack
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+      timeout: 10s
+      api_version: v2
+
+# Rule files — alert + recording
+rule_files:
+  - /etc/prometheus/rules/*.yml
+  - /etc/prometheus/recording/*.yml
+
+scrape_configs:
+  # -------------------------------------------------------------------------
+  # Self-monitoring
+  # -------------------------------------------------------------------------
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          component: prometheus
+          service: monitoring
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+        labels:
+          component: alertmanager
+          service: monitoring
+
+  - job_name: grafana
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["grafana:3000"]
+        labels:
+          component: grafana
+          service: monitoring
+
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+        labels:
+          component: loki
+          service: monitoring
+
+  # -------------------------------------------------------------------------
+  # Host metrics — Node Exporter
+  # Replace targets with real hosts or use file_sd
+  # -------------------------------------------------------------------------
+  - job_name: node-exporter
+    static_configs:
+      - targets:
+          - node-exporter:9100
+        labels:
+          component: node
+          service: infrastructure
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: "([^:]+):.*"
+        replacement: "${1}"
+
+  # -------------------------------------------------------------------------
+  # Container metrics — cAdvisor
+  # -------------------------------------------------------------------------
+  - job_name: cadvisor
+    static_configs:
+      - targets:
+          - cadvisor:8080
+        labels:
+          component: container
+          service: docker
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_compose_project]
+        regex: ".+"
+        target_label: compose_project
+
+  # -------------------------------------------------------------------------
+  # Blackbox — HTTP probes
+  # -------------------------------------------------------------------------
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://prometheus.io
+        labels:
+          component: blackbox
+          probe: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # -------------------------------------------------------------------------
+  # Blackbox — ICMP probes
+  # -------------------------------------------------------------------------
+  - job_name: blackbox-icmp
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets:
+          - 1.1.1.1
+          - 8.8.8.8
+        labels:
+          component: blackbox
+          probe: icmp
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # -------------------------------------------------------------------------
+  # Uptime Kuma
+  # -------------------------------------------------------------------------
+  - job_name: uptime-kuma
+    static_configs:
+      - targets: ["uptime-kuma:3001"]
+        labels:
+          component: uptime
+          service: synthetic
+
+  # -------------------------------------------------------------------------
+  # Proxmox VE Exporter (uncomment when enabled)
+  # -------------------------------------------------------------------------
+  # - job_name: pve
+  #   static_configs:
+  #     - targets: ["pve-exporter:9221"]
+  #       labels:
+  #         component: proxmox
+  #         service: hypervisor
+
+  # -------------------------------------------------------------------------
+  # File-based service discovery (multi-node)
+  # -------------------------------------------------------------------------
+  # - job_name: node-file-sd
+  #   file_sd_configs:
+  #     - files:
+  #         - /etc/prometheus/targets/nodes.json
+  #       refresh_interval: 30s
+
+  # -------------------------------------------------------------------------
+  # Federation
+  # -------------------------------------------------------------------------
+  # - job_name: federate
+  #   scrape_interval: 30s
+  #   honor_labels: true
+  #   metrics_path: /federate
+  #   params:
+  #     match[]:
+  #       - '{job=~".+"}'
+  #   static_configs:
+  #     - targets:
+  #         - prometheus-remote:9090
