@@ -1,0 +1,214 @@
+# =============================================================================
+# Service / Application stack alerts — MariaDB, Redis, Nextcloud, Immich,
+# Shinobi, Backup, Domain, UPS, SMART, Temperature
+# =============================================================================
+
+groups:
+  - name: services.database
+    interval: 30s
+    rules:
+      - alert: MariaDBDown
+        expr: mysql_up == 0 or up{job=~".*mysql.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "MariaDB/MySQL is down on {{ $labels.instance }}"
+          description: "MySQL exporter reports the database is unreachable."
+          dashboard_url: "{{ $externalURL }}/d/dg-mariadb"
+
+      - alert: RedisDown
+        expr: redis_up == 0 or up{job=~".*redis.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Redis is down on {{ $labels.instance }}"
+          description: "Redis exporter reports the instance is unreachable."
+          dashboard_url: "{{ $externalURL }}/d/dg-redis"
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Redis memory high on {{ $labels.instance }}"
+          description: "Redis memory usage is {{ $value | printf \"%.1f\" }}% of max."
+
+  - name: services.apps
+    interval: 30s
+    rules:
+      - alert: NextcloudDown
+        expr: probe_success{instance=~".*nextcloud.*"} == 0 or up{job=~".*nextcloud.*"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Nextcloud is down"
+          description: "Nextcloud health probe or exporter failed for {{ $labels.instance }}."
+          dashboard_url: "{{ $externalURL }}/d/dg-nextcloud"
+
+      - alert: ImmichDown
+        expr: probe_success{instance=~".*immich.*"} == 0 or up{job=~".*immich.*"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Immich is down"
+          description: "Immich health probe failed for {{ $labels.instance }}."
+          dashboard_url: "{{ $externalURL }}/d/dg-immich"
+
+      - alert: ShinobiDown
+        expr: probe_success{instance=~".*shinobi.*"} == 0 or up{job=~".*shinobi.*"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Shinobi is down"
+          description: "Shinobi NVR health probe failed for {{ $labels.instance }}."
+          dashboard_url: "{{ $externalURL }}/d/dg-shinobi"
+
+  - name: services.network_security
+    interval: 30s
+    rules:
+      - alert: PfSenseDown
+        expr: probe_success{instance=~".*pfsense.*"} == 0 or up{job=~".*pfsense.*|.*snmp.*pfsense.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: network
+        annotations:
+          summary: "pfSense is down / unreachable"
+          description: "pfSense target {{ $labels.instance }} is not responding."
+          dashboard_url: "{{ $externalURL }}/d/dg-pfsense"
+
+      - alert: MikrotikDown
+        expr: probe_success{instance=~".*mikrotik.*|.*router.*"} == 0 or up{job=~".*mikrotik.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: network
+        annotations:
+          summary: "Mikrotik is down / unreachable"
+          description: "Mikrotik target {{ $labels.instance }} is not responding."
+          dashboard_url: "{{ $externalURL }}/d/dg-mikrotik"
+
+      - alert: CloudflareExporterDown
+        expr: up{job=~".*cloudflare.*"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          team: network
+        annotations:
+          summary: "Cloudflare exporter is down"
+          description: "Cloudflare metrics collection failed."
+
+      - alert: DomainExpirationSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Domain or cert expiring soon for {{ $labels.instance }}"
+          description: "Expiration in approximately {{ $value | printf \"%.0f\" }} days."
+
+  - name: services.hardware
+    interval: 60s
+    rules:
+      - alert: UPSOnBattery
+        expr: ups_status{status="OL"} == 0 or nut_ups_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "UPS on battery: {{ $labels.instance }}"
+          description: "UPS is no longer online (on mains). Check power."
+          dashboard_url: "{{ $externalURL }}/d/dg-ups"
+
+      - alert: UPSBatteryLow
+        expr: ups_battery_charge < 30 or nut_battery_charge < 30
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "UPS battery low on {{ $labels.instance }}"
+          description: "Battery charge is {{ $value | printf \"%.0f\" }}%."
+
+      - alert: SMARTFailing
+        expr: smartmon_device_smart_healthy == 0 or node_disk_smart_status == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "SMART failure predicted on {{ $labels.instance }} / {{ $labels.disk }}"
+          description: "Disk SMART health reports failure. Replace disk ASAP."
+          dashboard_url: "{{ $externalURL }}/d/dg-smart"
+
+      - alert: HighTemperature
+        expr: node_hwmon_temp_celsius > 85 or ipmi_temperature_celsius > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High temperature on {{ $labels.instance }}"
+          description: "Sensor {{ $labels.sensor }} is {{ $value | printf \"%.1f\" }}°C."
+          dashboard_url: "{{ $externalURL }}/d/dg-temperature"
+
+  - name: services.backup
+    interval: 5m
+    rules:
+      - alert: BackupFailed
+        expr: increase(backup_last_status{status="failed"}[24h]) > 0 or (time() - backup_last_success_timestamp) > 172800
+        for: 15m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Backup failed or stale on {{ $labels.instance }}"
+          description: "No successful backup within SLA window."
+          dashboard_url: "{{ $externalURL }}/d/dg-backup"
+
+      - alert: SnapshotFailed
+        expr: increase(proxmox_snapshot_failed_total[1h]) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Proxmox snapshot failed"
+          description: "Snapshot failure detected for {{ $labels.instance }}."
+
+  - name: services.http
+    interval: 30s
+    rules:
+      - alert: HTTP500RateHigh
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (instance) / sum(rate(http_requests_total[5m])) by (instance) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "High HTTP 5xx rate on {{ $labels.instance }}"
+          description: "5xx ratio is {{ $value | printf \"%.2f\" }}."
+
+      - alert: APIFailure
+        expr: probe_success{job="blackbox-http", instance=~".*/api.*"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "API endpoint failure: {{ $labels.instance }}"
+          description: "API health probe is failing."
