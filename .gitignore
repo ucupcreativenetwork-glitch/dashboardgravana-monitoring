@@ -1,0 +1,66 @@
+# Environment and secrets — NEVER commit real credentials
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials/
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Grafana
+grafana/data/
+grafana/plugins/downloaded/
+*.db
+
+# Prometheus / Loki / Alertmanager persistent data
+prometheus/data/
+loki/data/
+alertmanager/data/
+uptime-kuma/data/
+
+# Backups (keep scripts, ignore actual dumps)
+backup/*.tar.gz
+backup/*.sql
+backup/*.dump
+restore/tmp/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Logs and temp
+*.log
+logs/
+tmp/
+.cache/
+
+# Python / Node (if any helper scripts)
+__pycache__/
+*.pyc
+node_modules/
+.venv/
+venv/
+
+# Test / coverage
+coverage/
+.coverage
+htmlcov/
+
+# GitHub Actions local
+.act/
+
+# Large binary assets that should be generated or linked
+images/screenshots/*.png
+!images/screenshots/.gitkeep
