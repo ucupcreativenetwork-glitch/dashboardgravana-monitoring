@@ -1,0 +1,9 @@
+# Default owners
+*       @ucupcreativenetwork-glitch
+
+# Core configs
+/docker-compose.yml    @ucupcreativenetwork-glitch
+/prometheus/           @ucupcreativenetwork-glitch
+/alertmanager/         @ucupcreativenetwork-glitch
+/grafana/              @ucupcreativenetwork-glitch
+/loki/                 @ucupcreativenetwork-glitch
