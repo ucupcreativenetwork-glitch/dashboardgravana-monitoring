@@ -8,21 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial production-grade monitoring stack scaffold
-- Docker Compose with Grafana, Prometheus, Alertmanager, Loki, Promtail, Node Exporter, cAdvisor, Blackbox Exporter, Uptime Kuma
-- Prometheus scrape configs, recording rules, and core alert rules (infrastructure, containers, application)
-- Alertmanager with Discord (primary), Telegram and Email ready receivers, inhibition and severity routing
-- Loki single-binary + Promtail with Docker, journal and file discovery
-- Grafana provisioning (Prometheus, Loki, Alertmanager datasources)
-- Executive Overview dashboard
-- Comprehensive `.env.example`, security policy, contribution guide
-- GitHub issue / PR templates and Dependabot configuration
+- Full set of Grafana dashboards 01–35 (Executive through Datacenter)
+- Extended alert rules: services (MariaDB, Redis, Nextcloud, Immich, Shinobi), network (pfSense, Mikrotik, Cloudflare), hardware (UPS, SMART, temperature), backup, HTTP 5xx
+- Proxmox alert rules and PVE exporter profile (`docker compose --profile proxmox`)
+- Runbooks: node-down, SSL, filesystem, UPS
+- Loki logs + audit dashboards
 
-### Security
-- Secrets isolated via `.env`; `.gitignore` blocks credentials
-- No anonymous Grafana access by default
-- Resource limits and healthchecks on all critical services
+## [0.2.0] - 2026-08-04
+
+### Added
+- Complete dashboard suite and extended alerting
 
 ## [0.1.0] - 2026-08-04
 
-- Project bootstrap
+### Added
+- Initial production monitoring stack scaffold
+- Docker Compose core services
+- Prometheus, Alertmanager, Loki, Grafana provisioning
+- Executive Overview dashboard
+- Install / backup / restore scripts
+- GitHub CI and templates

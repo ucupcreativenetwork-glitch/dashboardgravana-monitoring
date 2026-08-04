@@ -1,0 +1,9 @@
+# Production PVE exporter config — prefer API tokens over passwords
+# Credentials can also be injected via environment variables.
+default:
+  user: ${PVE_USER}
+  # Prefer token:
+  # token_name: ${PVE_TOKEN_NAME}
+  # token_value: ${PVE_TOKEN_VALUE}
+  password: ${PVE_PASSWORD}
+  verify_ssl: true
