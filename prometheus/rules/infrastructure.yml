@@ -1,0 +1,112 @@
+# =============================================================================
+# Infrastructure Alert Rules — CPU, Memory, Disk, Filesystem, Load, Node
+# Severity levels: warning | critical | emergency
+# All alerts include runbook annotations and dashboard links.
+# =============================================================================
+
+groups:
+  - name: infrastructure.node
+    interval: 30s
+    rules:
+      - alert: NodeDown
+        expr: up{job="node-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Node {{ $labels.instance }} is down"
+          description: "Node Exporter target {{ $labels.instance }} has been unreachable for more than 2 minutes."
+          runbook_url: "https://github.com/ucupcreativenetwork-glitch/dashboardgravana-monitoring/blob/main/docs/runbooks/node-down.md"
+          dashboard_url: "{{ $externalURL }}/d/linux-overview"
+
+      - alert: NodeHighCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold 85%) for 5 minutes."
+          dashboard_url: "{{ $externalURL }}/d/linux-overview"
+
+      - alert: NodeCriticalCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 3m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Critical CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold 95%)."
+
+      - alert: NodeHighMemory
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High memory pressure on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}%."
+
+      - alert: NodeCriticalMemory
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 97
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Critical memory on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}%. OOM risk."
+
+      - alert: NodeHighLoad
+        expr: node_load15 / count without(cpu, mode) (node_cpu_seconds_total{mode="idle"}) > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High load average on {{ $labels.instance }}"
+          description: "15-minute load average per CPU is {{ $value | printf \"%.2f\" }}."
+
+      - alert: FilesystemAlmostFull
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Filesystem almost full on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          description: "Only {{ $value | printf \"%.1f\" }}% free on {{ $labels.mountpoint }}."
+
+      - alert: FilesystemCritical
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes) * 100 < 5
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Filesystem critically full on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+          description: "Only {{ $value | printf \"%.1f\" }}% free. Immediate action required."
+
+      - alert: FilesystemReadOnly
+        expr: node_filesystem_readonly{fstype!~"tmpfs|overlay"} == 1
+        for: 1m
+        labels:
+          severity: emergency
+          team: infrastructure
+        annotations:
+          summary: "Filesystem mounted read-only on {{ $labels.instance }}"
+          description: "Mountpoint {{ $labels.mountpoint }} is read-only. Possible hardware or corruption issue."
+
+      - alert: DiskHighIO
+        expr: rate(node_disk_io_time_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High disk IO utilization on {{ $labels.instance }}"
+          description: "Device {{ $labels.device }} IO time is {{ $value | printf \"%.2f\" }}."
