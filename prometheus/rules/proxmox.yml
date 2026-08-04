@@ -1,0 +1,52 @@
+# =============================================================================
+# Proxmox VE alert rules
+# Requires prometheus-pve-exporter metrics
+# =============================================================================
+
+groups:
+  - name: proxmox.cluster
+    interval: 30s
+    rules:
+      - alert: ProxmoxNodeDown
+        expr: pve_up == 0 or up{job="pve"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Proxmox node/exporter down: {{ $labels.instance }}"
+          description: "PVE exporter or node is unreachable."
+          dashboard_url: "{{ $externalURL }}/d/dg-proxmox-cluster"
+
+      - alert: ProxmoxVMDown
+        expr: pve_guest_info{type="qemu"} == 1 unless on(id, instance) pve_cpu_usage{type="qemu"}
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Proxmox VM may be stopped: {{ $labels.name }}"
+          description: "Guest {{ $labels.name }} appears registered but not producing CPU metrics."
+          dashboard_url: "{{ $externalURL }}/d/dg-vms"
+
+      - alert: ProxmoxLXCDown
+        expr: pve_guest_info{type="lxc"} == 1 unless on(id, instance) pve_cpu_usage{type="lxc"}
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Proxmox LXC may be stopped: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} appears registered but not producing CPU metrics."
+          dashboard_url: "{{ $externalURL }}/d/dg-lxc"
+
+      - alert: ProxmoxStorageLow
+        expr: pve_storage_size_bytes > 0 and (pve_storage_usage_bytes / pve_storage_size_bytes) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Proxmox storage almost full: {{ $labels.storage }}"
+          description: "Storage usage is {{ $value | printf \"%.0f\" }}% on {{ $labels.instance }}."
+          dashboard_url: "{{ $externalURL }}/d/dg-storage"
