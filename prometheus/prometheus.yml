@@ -1,12 +1,13 @@
 # =============================================================================
 # Prometheus Configuration — DashboardGravana Monitoring Stack
 # Production-ready scrape configuration with multi-target support,
-# recording rules, alert rules, and federation readiness.
+# file_sd, recording rules, alert rules, and federation readiness.
 #
 # Design principles:
 # - Explicit job labels for every target class
 # - Relabeling for consistent instance / job / environment labels
-# - File-based service discovery ready (targets/*.json)
+# - File-based service discovery (targets/*.json) — preferred for fleets
+# - Blackbox multi-module probes (HTTP, ICMP, TCP, TLS, DNS)
 # - Support for future Kubernetes SD and federation
 # - Retention and remote_write controlled via command-line / env
 # =============================================================================
@@ -67,17 +68,22 @@ scrape_configs:
           component: loki
           service: monitoring
 
+  - job_name: blackbox-exporter
+    static_configs:
+      - targets: ["blackbox-exporter:9115"]
+        labels:
+          component: blackbox
+          service: monitoring
+
   # -------------------------------------------------------------------------
-  # Host metrics — Node Exporter
-  # Replace targets with real hosts or use file_sd
+  # Host metrics — Node Exporter (file_sd preferred for multi-node)
+  # Edit prometheus/targets/nodes.json to add hosts without restart
   # -------------------------------------------------------------------------
   - job_name: node-exporter
-    static_configs:
-      - targets:
-          - node-exporter:9100
-        labels:
-          component: node
-          service: infrastructure
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/nodes.json
+        refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance
@@ -100,18 +106,39 @@ scrape_configs:
         target_label: compose_project
 
   # -------------------------------------------------------------------------
-  # Blackbox — HTTP probes
+  # Blackbox — HTTP probes (file_sd)
   # -------------------------------------------------------------------------
   - job_name: blackbox-http
     metrics_path: /probe
     params:
       module: [http_2xx]
-    static_configs:
-      - targets:
-          - https://prometheus.io
-        labels:
-          component: blackbox
-          probe: http
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/blackbox-http.json
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+      - source_labels: [__param_target]
+        regex: "https?://([^/]+).*"
+        target_label: host
+        replacement: "${1}"
+
+  # -------------------------------------------------------------------------
+  # Blackbox — ICMP probes (file_sd)
+  # -------------------------------------------------------------------------
+  - job_name: blackbox-icmp
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/blackbox-icmp.json
+        refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -121,19 +148,55 @@ scrape_configs:
         replacement: blackbox-exporter:9115
 
   # -------------------------------------------------------------------------
-  # Blackbox — ICMP probes
+  # Blackbox — TCP connect (file_sd)
   # -------------------------------------------------------------------------
-  - job_name: blackbox-icmp
+  - job_name: blackbox-tcp
     metrics_path: /probe
     params:
-      module: [icmp]
-    static_configs:
-      - targets:
-          - 1.1.1.1
-          - 8.8.8.8
-        labels:
-          component: blackbox
-          probe: icmp
+      module: [tcp_connect]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/blackbox-tcp.json
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # -------------------------------------------------------------------------
+  # Blackbox — TLS / SSL certificate (file_sd)
+  # Metrics: probe_ssl_earliest_cert_expiry, probe_success
+  # -------------------------------------------------------------------------
+  - job_name: blackbox-ssl
+    metrics_path: /probe
+    params:
+      module: [tls_connect]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/blackbox-ssl.json
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # -------------------------------------------------------------------------
+  # Blackbox — DNS (file_sd)
+  # -------------------------------------------------------------------------
+  - job_name: blackbox-dns
+    metrics_path: /probe
+    params:
+      module: [dns_a]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/blackbox-dns.json
+        refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -153,26 +216,23 @@ scrape_configs:
           service: synthetic
 
   # -------------------------------------------------------------------------
-  # Proxmox VE Exporter (uncomment when enabled)
+  # Proxmox VE Exporter
+  # Enable service with: docker compose --profile pve up -d
+  # If pve-exporter is not running, this job will show as down (expected)
   # -------------------------------------------------------------------------
-  # - job_name: pve
-  #   static_configs:
-  #     - targets: ["pve-exporter:9221"]
-  #       labels:
-  #         component: proxmox
-  #         service: hypervisor
+  - job_name: pve
+    static_configs:
+      - targets: ["pve-exporter:9221"]
+        labels:
+          component: proxmox
+          service: hypervisor
+    metrics_path: /pve
+    params:
+      module: [default]
+    scrape_timeout: 30s
 
   # -------------------------------------------------------------------------
-  # File-based service discovery (multi-node)
-  # -------------------------------------------------------------------------
-  # - job_name: node-file-sd
-  #   file_sd_configs:
-  #     - files:
-  #         - /etc/prometheus/targets/nodes.json
-  #       refresh_interval: 30s
-
-  # -------------------------------------------------------------------------
-  # Federation
+  # Federation (multi-Prometheus / hierarchical setup)
   # -------------------------------------------------------------------------
   # - job_name: federate
   #   scrape_interval: 30s
