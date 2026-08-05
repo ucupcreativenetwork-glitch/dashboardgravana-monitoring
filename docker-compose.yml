@@ -1,22 +1,6 @@
 # =============================================================================
 # DashboardGravana Monitoring Stack — Docker Compose
-# Production-grade, modular, multi-node ready
-# Ubuntu 24.04 LTS | Docker Compose v2
-# =============================================================================
-#
-# Profiles:
-#   (default) — core stack (Grafana, Prometheus, Alertmanager, Loki, exporters)
-#   pve       — Proxmox VE exporter (alias: proxmox)
-#
-# Quick start:
-#   cp .env.example .env && edit secrets
-#   docker compose up -d
-#   docker compose --profile pve up -d   # optional Proxmox
-#
-# Security notes:
-# - Bind ports to private interfaces in production (see docs)
-# - Never commit real .env or pve-exporter/pve.yml
-# - Blackbox has CAP_NET_RAW solely for ICMP probes
+# Profiles: default | pve | exporters
 # =============================================================================
 
 x-logging: &default-logging
@@ -68,9 +52,6 @@ services:
         limits:
           cpus: "2.0"
           memory: 2G
-        reservations:
-          cpus: "0.25"
-          memory: 256M
 
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -85,8 +66,6 @@ services:
       - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-50GB}
       - --web.enable-lifecycle
       - --web.enable-admin-api
-      - --web.console.libraries=/usr/share/prometheus/console_libraries
-      - --web.console.templates=/usr/share/prometheus/consoles
       - --web.enable-remote-write-receiver
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -103,16 +82,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
     logging: *default-logging
     deploy:
       resources:
         limits:
           cpus: "4.0"
           memory: 8G
-        reservations:
-          cpus: "0.5"
-          memory: 512M
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -122,19 +97,20 @@ services:
       - "${ALERTMANAGER_PORT:-9093}:9093"
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./alertmanager/templates:/etc/alertmanager/templates:ro
       - alertmanager_data:/alertmanager
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
-      - --web.external-url=${PUBLIC_URL:-http://localhost:9093}/alertmanager
+      - --cluster.listen-address=0.0.0.0:9094
     networks:
       - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9093/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
 
   loki:
     image: grafana/loki:3.1.1
@@ -153,13 +129,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
-          memory: 2G
 
   promtail:
     image: grafana/promtail:3.1.1
@@ -177,11 +147,6 @@ services:
       loki:
         condition: service_healthy
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
 
   node-exporter:
     image: prom/node-exporter:v1.8.2
@@ -204,11 +169,6 @@ services:
       - monitoring
     pid: host
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
@@ -228,11 +188,6 @@ services:
     devices:
       - /dev/kmsg
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
 
   blackbox-exporter:
     image: prom/blackbox-exporter:v0.25.0
@@ -249,11 +204,6 @@ services:
     networks:
       - monitoring
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 128M
 
   uptime-kuma:
     image: louislam/uptime-kuma:1.23.13
@@ -266,13 +216,7 @@ services:
     networks:
       - monitoring
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 1G
 
-  # Enable: docker compose --profile pve up -d
   pve-exporter:
     image: prompve/prometheus-pve-exporter:3.4.5
     container_name: dg-pve-exporter
@@ -294,11 +238,32 @@ services:
       - pve
       - proxmox
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 256M
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    container_name: dg-mysqld-exporter
+    <<: *default-restart
+    profiles: ["exporters"]
+    ports:
+      - "${MYSQLD_EXPORTER_PORT:-9104}:9104"
+    environment:
+      DATA_SOURCE_NAME: "${MYSQL_EXPORTER_DSN:-monitoring:CHANGE_ME@(mariadb:3306)/}"
+    networks:
+      - monitoring
+    logging: *default-logging
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: dg-redis-exporter
+    <<: *default-restart
+    profiles: ["exporters"]
+    ports:
+      - "${REDIS_EXPORTER_PORT:-9121}:9121"
+    environment:
+      REDIS_ADDR: "${REDIS_EXPORTER_ADDR:-redis://redis:6379}"
+    networks:
+      - monitoring
+    logging: *default-logging
 
 networks:
   monitoring:
