@@ -1,21 +1,21 @@
 # =============================================================================
 # DashboardGravana Monitoring Stack — Docker Compose
-# Production-grade, modular, multi-node ready, future K8s migration path
+# Production-grade, modular, multi-node ready
 # Ubuntu 24.04 LTS | Docker Compose v2
 # =============================================================================
 #
 # Profiles:
-#   default   — core stack (Grafana, Prometheus, Alertmanager, Loki, exporters)
-#   pve       — Proxmox VE exporter
+#   (default) — core stack (Grafana, Prometheus, Alertmanager, Loki, exporters)
+#   pve       — Proxmox VE exporter (alias: proxmox)
 #
 # Quick start:
 #   cp .env.example .env && edit secrets
 #   docker compose up -d
-#   docker compose --profile pve up -d   # optional
+#   docker compose --profile pve up -d   # optional Proxmox
 #
 # Security notes:
 # - Bind ports to private interfaces in production (see docs)
-# - Never commit real .env
+# - Never commit real .env or pve-exporter/pve.yml
 # - Blackbox has CAP_NET_RAW solely for ICMP probes
 # =============================================================================
 
@@ -29,9 +29,6 @@ x-restart: &default-restart
   restart: unless-stopped
 
 services:
-  # ---------------------------------------------------------------------------
-  # Grafana — Visualization & dashboards
-  # ---------------------------------------------------------------------------
   grafana:
     image: grafana/grafana:11.2.0
     container_name: dg-grafana
@@ -75,9 +72,6 @@ services:
           cpus: "0.25"
           memory: 256M
 
-  # ---------------------------------------------------------------------------
-  # Prometheus — Metrics collection & alerting engine
-  # ---------------------------------------------------------------------------
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: dg-prometheus
@@ -120,9 +114,6 @@ services:
           cpus: "0.5"
           memory: 512M
 
-  # ---------------------------------------------------------------------------
-  # Alertmanager — Alert routing, grouping, silencing
-  # ---------------------------------------------------------------------------
   alertmanager:
     image: prom/alertmanager:v0.27.0
     container_name: dg-alertmanager
@@ -145,9 +136,6 @@ services:
           cpus: "0.5"
           memory: 256M
 
-  # ---------------------------------------------------------------------------
-  # Loki — Log aggregation
-  # ---------------------------------------------------------------------------
   loki:
     image: grafana/loki:3.1.1
     container_name: dg-loki
@@ -173,9 +161,6 @@ services:
           cpus: "2.0"
           memory: 2G
 
-  # ---------------------------------------------------------------------------
-  # Promtail — Log shipper
-  # ---------------------------------------------------------------------------
   promtail:
     image: grafana/promtail:3.1.1
     container_name: dg-promtail
@@ -198,9 +183,6 @@ services:
           cpus: "0.5"
           memory: 256M
 
-  # ---------------------------------------------------------------------------
-  # Node Exporter — Host metrics (Linux)
-  # ---------------------------------------------------------------------------
   node-exporter:
     image: prom/node-exporter:v1.8.2
     container_name: dg-node-exporter
@@ -228,9 +210,6 @@ services:
           cpus: "0.5"
           memory: 128M
 
-  # ---------------------------------------------------------------------------
-  # cAdvisor — Container metrics
-  # ---------------------------------------------------------------------------
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: dg-cadvisor
@@ -255,9 +234,6 @@ services:
           cpus: "1.0"
           memory: 512M
 
-  # ---------------------------------------------------------------------------
-  # Blackbox Exporter — HTTP/ICMP/TCP/TLS/DNS probes
-  # ---------------------------------------------------------------------------
   blackbox-exporter:
     image: prom/blackbox-exporter:v0.25.0
     container_name: dg-blackbox-exporter
@@ -268,7 +244,6 @@ services:
       - ./prometheus/blackbox.yml:/config/blackbox.yml:ro
     command:
       - --config.file=/config/blackbox.yml
-    # ICMP probes require NET_RAW (safe, scoped capability)
     cap_add:
       - NET_RAW
     networks:
@@ -280,9 +255,6 @@ services:
           cpus: "0.5"
           memory: 128M
 
-  # ---------------------------------------------------------------------------
-  # Uptime Kuma — Synthetic monitoring & status pages
-  # ---------------------------------------------------------------------------
   uptime-kuma:
     image: louislam/uptime-kuma:1.23.13
     container_name: dg-uptime-kuma
@@ -300,32 +272,33 @@ services:
           cpus: "1.0"
           memory: 1G
 
-  # ---------------------------------------------------------------------------
-  # Proxmox VE Exporter (optional profile: pve)
-  # ---------------------------------------------------------------------------
+  # Enable: docker compose --profile pve up -d
   pve-exporter:
-    image: prompve/prometheus-pve-exporter:3.4.4
+    image: prompve/prometheus-pve-exporter:3.4.5
     container_name: dg-pve-exporter
     <<: *default-restart
-    profiles: ["pve"]
     ports:
       - "${PVE_EXPORTER_PORT:-9221}:9221"
+    volumes:
+      - ./pve-exporter/pve.yml:/etc/prometheus/pve.yml:ro
+    command:
+      - --config.file=/etc/prometheus/pve.yml
     environment:
       PVE_USER: ${PVE_USER:-monitoring@pve}
       PVE_PASSWORD: ${PVE_PASSWORD:-}
       PVE_TOKEN_NAME: ${PVE_TOKEN_NAME:-}
       PVE_TOKEN_VALUE: ${PVE_TOKEN_VALUE:-}
-      PVE_VERIFY_SSL: ${PVE_VERIFY_SSL:-false}
-    volumes:
-      - ./pve-exporter/pve.yml:/etc/prometheus/pve.yml:ro
     networks:
       - monitoring
+    profiles:
+      - pve
+      - proxmox
     logging: *default-logging
     deploy:
       resources:
         limits:
           cpus: "0.5"
-          memory: 128M
+          memory: 256M
 
 networks:
   monitoring:
