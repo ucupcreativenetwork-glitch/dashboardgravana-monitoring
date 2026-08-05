@@ -13,11 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PVE profile** (`docker compose --profile pve`) with token-safe `pve.yml.example`, file_sd scrape, `docs/PROXMOX.md`
 - Alertmanager **Discord + Telegram + Email** receivers with `alertmanager.yml.tmpl` and `scripts/render-alertmanager-config.sh` (envsubst)
 - CI hardening: YAML/JSON/Compose/shellcheck/promtool/secrets jobs that **fail** on broken configs
-- Docs: `docs/BLACKBOX.md`, `docs/TELEGRAM.md`, expanded `docs/ALERTMANAGER.md`
+- Docs: `docs/BLACKBOX.md`, `docs/TELEGRAM.md`, `docs/REVERSE-PROXY.md`, `docs/BACKUP.md`, `ROADMAP.md`
+- Backup retention (`DG_BACKUP_KEEP`), optional quiesce (`DG_BACKUP_QUIESCE`), safer restore with `--yes`
 
 ### Changed
 - Node-exporter and blackbox scrape jobs prefer file_sd over static lists
 - `install.sh` / `update.sh` render Alertmanager config before stack start
+- README documentation index expanded
 
 ## [0.2.0] - 2026-08-04
 
