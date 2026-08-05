@@ -1,0 +1,29 @@
+[
+  {
+    "targets": [
+      "https://prometheus.io",
+      "https://grafana.com"
+    ],
+    "labels": {
+      "env": "production",
+      "probe": "http",
+      "component": "blackbox",
+      "tier": "external"
+    }
+  },
+  {
+    "targets": [
+      "http://grafana:3000/api/health",
+      "http://prometheus:9090/-/healthy",
+      "http://alertmanager:9093/-/healthy",
+      "http://loki:3100/ready",
+      "http://uptime-kuma:3001"
+    ],
+    "labels": {
+      "env": "production",
+      "probe": "http",
+      "component": "blackbox",
+      "tier": "internal-stack"
+    }
+  }
+]

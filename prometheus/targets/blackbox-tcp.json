@@ -1,0 +1,14 @@
+[
+  {
+    "targets": [
+      "1.1.1.1:53",
+      "8.8.8.8:53"
+    ],
+    "labels": {
+      "env": "production",
+      "probe": "tcp",
+      "component": "blackbox",
+      "service": "dns"
+    }
+  }
+]

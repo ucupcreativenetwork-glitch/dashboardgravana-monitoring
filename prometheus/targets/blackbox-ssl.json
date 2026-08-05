@@ -1,0 +1,14 @@
+[
+  {
+    "targets": [
+      "prometheus.io:443",
+      "grafana.com:443"
+    ],
+    "labels": {
+      "env": "production",
+      "probe": "ssl",
+      "component": "blackbox",
+      "tier": "external"
+    }
+  }
+]

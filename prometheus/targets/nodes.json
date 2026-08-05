@@ -1,0 +1,14 @@
+[
+  {
+    "targets": [
+      "node-exporter:9100"
+    ],
+    "labels": {
+      "env": "production",
+      "site": "local",
+      "role": "monitoring-host",
+      "component": "node",
+      "service": "infrastructure"
+    }
+  }
+]

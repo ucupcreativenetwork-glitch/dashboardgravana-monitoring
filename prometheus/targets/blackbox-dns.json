@@ -1,0 +1,14 @@
+[
+  {
+    "targets": [
+      "1.1.1.1",
+      "8.8.8.8"
+    ],
+    "labels": {
+      "env": "production",
+      "probe": "dns",
+      "component": "blackbox",
+      "query": "example.com"
+    }
+  }
+]
