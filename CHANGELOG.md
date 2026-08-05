@@ -8,16 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Full set of Grafana dashboards 01–35 (Executive through Datacenter)
-- Extended alert rules: services (MariaDB, Redis, Nextcloud, Immich, Shinobi), network (pfSense, Mikrotik, Cloudflare), hardware (UPS, SMART, temperature), backup, HTTP 5xx
-- Proxmox alert rules and PVE exporter profile (`docker compose --profile proxmox`)
-- Runbooks: node-down, SSL, filesystem, UPS
-- Loki logs + audit dashboards
+- Prometheus **file_sd** targets (`prometheus/targets/*.json`) for nodes, blackbox HTTP/ICMP/TCP/SSL/DNS, and PVE API
+- Expanded Blackbox modules (`tls_connect`, `http_2xx_ssl`, DNS) + `CAP_NET_RAW` for ICMP
+- **PVE profile** (`docker compose --profile pve`) with token-safe `pve.yml.example`, file_sd scrape, `docs/PROXMOX.md`
+- Alertmanager **Discord + Telegram + Email** receivers with `alertmanager.yml.tmpl` and `scripts/render-alertmanager-config.sh` (envsubst)
+- CI hardening: YAML/JSON/Compose/shellcheck/promtool/secrets jobs that **fail** on broken configs
+- Docs: `docs/BLACKBOX.md`, `docs/TELEGRAM.md`, expanded `docs/ALERTMANAGER.md`
+
+### Changed
+- Node-exporter and blackbox scrape jobs prefer file_sd over static lists
+- `install.sh` / `update.sh` render Alertmanager config before stack start
 
 ## [0.2.0] - 2026-08-04
 
 ### Added
-- Complete dashboard suite and extended alerting
+- Full set of Grafana dashboards 01–35 (Executive through Datacenter)
+- Extended alert rules: services, network, hardware, backup, HTTP 5xx
+- Proxmox alert rules and exporter profile
+- Runbooks: node-down, SSL, filesystem, UPS
+- Loki logs + audit dashboards
 
 ## [0.1.0] - 2026-08-04
 
