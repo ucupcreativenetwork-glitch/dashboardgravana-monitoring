@@ -1,3 +1,7 @@
+# =============================================================================
+# DashboardGravana — CI validation (must fail on broken configs)
+# YAML · JSON dashboards · file_sd targets · Compose · Shell · Prometheus rules
+# =============================================================================
 name: Validate
 
 on:
@@ -5,55 +9,217 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  yaml-json:
+  yaml:
+    name: YAML
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install tools
+      - name: Install yamllint + PyYAML
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq yamllint jq
-          pip install --quiet yamllint 2>/dev/null || true
+          sudo apt-get install -y -qq yamllint
+          pip3 install --quiet pyyaml
 
-      - name: Validate YAML
+      - name: Yamllint
         run: |
-          find . -name '*.yml' -o -name '*.yaml' | grep -v node_modules | while read f; do
-            echo "Checking $f"
-            yamllint -d "{extends: relaxed, rules: {line-length: disable, document-start: disable}}" "$f" || true
-          done
+          yamllint -c .yamllint.yml \
+            docker-compose.yml \
+            prometheus/prometheus.yml \
+            prometheus/blackbox.yml \
+            prometheus/rules \
+            prometheus/recording \
+            alertmanager/alertmanager.yml \
+            loki \
+            promtail \
+            .github
 
-      - name: Validate Grafana dashboard JSON
+      - name: PyYAML structural parse
         run: |
-          find grafana/dashboards -name '*.json' | while read f; do
-            echo "Validating $f"
-            jq empty "$f"
-            jq -e '.title and .uid and .panels' "$f" > /dev/null
-          done
+          set -euo pipefail
+          python3 <<'PY'
+          import sys, yaml, pathlib
+          roots = [
+            "docker-compose.yml",
+            "prometheus/prometheus.yml",
+            "prometheus/blackbox.yml",
+            "alertmanager/alertmanager.yml",
+            "loki/loki-config.yml",
+            "promtail/promtail-config.yml",
+            ".github/dependabot.yml",
+            ".github/workflows/validate.yml",
+          ]
+          roots += [str(p) for p in pathlib.Path("prometheus/rules").glob("*.yml")]
+          roots += [str(p) for p in pathlib.Path("prometheus/recording").glob("*.yml")]
+          failed = 0
+          for path in roots:
+            p = pathlib.Path(path)
+            if not p.exists():
+              print(f"SKIP missing {path}")
+              continue
+            try:
+              yaml.safe_load(p.read_text())
+              print(f"OK  {path}")
+            except Exception as e:
+              print(f"FAIL {path}: {e}")
+              failed += 1
+          sys.exit(1 if failed else 0)
+          PY
 
-      - name: Validate docker-compose structure
-        run: |
-          # Basic structural check without full docker
-          python3 -c "
-          import yaml, sys
-          with open('docker-compose.yml') as f:
-              data = yaml.safe_load(f)
-          assert 'services' in data
-          assert 'grafana' in data['services']
-          assert 'prometheus' in data['services']
-          print('docker-compose.yml structure OK')
-          "
-
-  markdown:
+  json:
+    name: JSON
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check markdown exists
+
+      - name: Validate dashboard JSON
         run: |
-          test -f README.md
-          test -f SECURITY.md
-          test -f CONTRIBUTING.md
-          test -f CHANGELOG.md
-          echo "Core markdown files present"
+          set -euo pipefail
+          min_panels=8
+          find grafana/dashboards -name '*.json' -print0 | while IFS= read -r -d '' f; do
+            echo "==> $f"
+            jq empty "$f"
+            jq -e '.title and .uid and (.panels | type == "array")' "$f" >/dev/null
+            panels=$(jq '.panels | length' "$f")
+            if [ "$panels" -lt "$min_panels" ]; then
+              echo "FAIL: $f has $panels panels (min $min_panels)"
+              exit 1
+            fi
+            jq -e '.schemaVersion >= 30' "$f" >/dev/null
+          done
+          total=$(find grafana/dashboards -name '*.json' | wc -l)
+          echo "Validated $total dashboards (min panels=$min_panels)"
+          test "$total" -ge 30
+
+      - name: Validate file_sd target JSON
+        run: |
+          set -euo pipefail
+          for f in prometheus/targets/*.json; do
+            echo "==> $f"
+            jq empty "$f"
+            jq -e 'type == "array" and length >= 1 and .[0].targets' "$f" >/dev/null
+          done
+          echo "All file_sd targets OK"
+
+      - name: Unique dashboard UIDs
+        run: |
+          set -euo pipefail
+          dups=$(find grafana/dashboards -name '*.json' -exec jq -r '.uid' {} \; | sort | uniq -d || true)
+          if [ -n "$dups" ]; then
+            echo "FAIL: duplicate UIDs:"; echo "$dups"; exit 1
+          fi
+          echo "UIDs unique OK"
+
+  compose:
+    name: Compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: docker compose config
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          sed -i 's/CHANGE_ME_STRONG_PASSWORD/ci-test-password-not-for-prod/' .env
+          docker compose config --quiet
+          docker compose --profile pve config --quiet
+          echo "docker compose config OK (default + profile pve)"
+
+  shell:
+    name: Shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: Shellcheck scripts
+        run: |
+          set -euo pipefail
+          shellcheck -x -e SC1091,SC2312 scripts/*.sh
+          echo "shellcheck OK"
+
+      - name: Scripts shebang
+        run: |
+          set -euo pipefail
+          for s in scripts/*.sh; do
+            head -1 "$s" | grep -q '^#!'
+            echo "OK shebang $s"
+          done
+
+  prometheus-rules:
+    name: Prometheus rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: promtool check rules
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/prometheus:/prometheus:ro" \
+            prom/prometheus:v2.54.1 \
+            promtool check rules \
+              /prometheus/rules/application.yml \
+              /prometheus/rules/containers.yml \
+              /prometheus/rules/infrastructure.yml \
+              /prometheus/rules/proxmox.yml \
+              /prometheus/rules/services.yml \
+              /prometheus/recording/node.yml
+          echo "promtool rules OK"
+
+  docs-secrets:
+    name: Docs and secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Core docs present
+        run: |
+          set -euo pipefail
+          for f in README.md LICENSE SECURITY.md CONTRIBUTING.md CHANGELOG.md \
+                   docs/INSTALL.md docs/ALERTMANAGER.md docs/PROXMOX.md docs/BLACKBOX.md docs/TELEGRAM.md; do
+            test -f "$f" || { echo "MISSING $f"; exit 1; }
+            echo "OK $f"
+          done
+
+      - name: No obvious secrets in git tree
+        run: |
+          set -euo pipefail
+          if grep -RInE 'BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY' \
+              --exclude-dir=.git --exclude='*.md' . ; then
+            echo "FAIL: private key material found"
+            exit 1
+          fi
+          echo "No obvious private keys detected"
+
+  alertmanager:
+    name: Alertmanager
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Template and multi-channel receivers
+        run: |
+          set -euo pipefail
+          test -f alertmanager/alertmanager.yml.tmpl
+          test -f alertmanager/alertmanager.yml
+          test -f alertmanager/templates/discord.tmpl
+          test -f alertmanager/templates/telegram.tmpl
+          test -f alertmanager/templates/email.tmpl
+          pip3 install --quiet pyyaml
+          python3 -c "import yaml; yaml.safe_load(open('alertmanager/alertmanager.yml'))"
+          grep -q 'telegram_configs' alertmanager/alertmanager.yml
+          grep -q 'email_configs' alertmanager/alertmanager.yml
+          grep -q 'discord_configs' alertmanager/alertmanager.yml
+          echo "Alertmanager multi-channel config OK"
