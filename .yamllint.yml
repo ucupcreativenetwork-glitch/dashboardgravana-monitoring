@@ -1,0 +1,21 @@
+# Yamllint config — DashboardGravana CI
+extends: relaxed
+
+rules:
+  line-length: disable
+  document-start: disable
+  truthy:
+    allowed-values: ["true", "false", "yes", "no", "on", "off"]
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  brackets:
+    max-spaces-inside: -1
+  indentation:
+    spaces: consistent
+    indent-sequences: consistent
+
+ignore: |
+  **/*.tmpl
+  **/node_modules/**
+  **/.git/**
