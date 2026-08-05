@@ -76,7 +76,15 @@ create_dirs() {
   ok "Directory structure ready"
 }
 
+render_alertmanager() {
+  if [[ -x "${ROOT_DIR}/scripts/render-alertmanager-config.sh" ]]; then
+    log "Rendering Alertmanager config from template + .env"
+    "${ROOT_DIR}/scripts/render-alertmanager-config.sh" || warn "Alertmanager render failed — using existing alertmanager.yml"
+  fi
+}
+
 start_stack() {
+  render_alertmanager
   log "Validating compose file..."
   docker compose config -q
   log "Pulling images..."

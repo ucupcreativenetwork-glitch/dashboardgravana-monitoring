@@ -33,31 +33,21 @@ H
   esac
 done
 
-if [[ "$YES" -ne 1 ]]; then
-  read -r -p "Update DashboardGravana (git + images + recreate)? [y/N] " ans
-  [[ "${ans,,}" == "y" || "${ans,,}" == "yes" ]] || { log "aborted"; exit 0; }
+if [[ "$SKIP_GIT" -eq 0 ]] && [[ -d .git ]]; then
+  log "git pull"
+  git pull --ff-only || die "git pull failed"
 fi
 
-if [[ "$SKIP_GIT" -eq 0 ]]; then
-  if [[ -d .git ]]; then
-    log "git pull..."
-    git pull --ff-only || log "WARN: git pull failed (continue with local tree)"
-  else
-    log "no .git directory — skip git pull"
-  fi
+if [[ -x "${ROOT}/scripts/render-alertmanager-config.sh" ]]; then
+  log "Rendering Alertmanager config"
+  "${ROOT}/scripts/render-alertmanager-config.sh" || true
 fi
 
 if [[ "$SKIP_PULL" -eq 0 ]]; then
-  log "docker compose pull..."
+  log "docker compose pull"
   docker compose pull
 fi
 
-log "recreate services..."
+log "Recreating stack"
 docker compose up -d --remove-orphans
-
-log "waiting for health..."
-sleep 5
-docker compose ps
-
-log "done. Check CHANGELOG.md for breaking changes after major bumps."
-log "Verify: curl -s localhost:9090/-/ready && curl -s localhost:3000/api/health"
+log "Done. Run ./scripts/healthcheck.sh to verify."
