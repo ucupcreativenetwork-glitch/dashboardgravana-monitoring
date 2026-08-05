@@ -64,3 +64,7 @@ htmlcov/
 # Large binary assets that should be generated or linked
 images/screenshots/*.png
 !images/screenshots/.gitkeep
+
+# Proxmox exporter secrets (keep only pve.yml.example in git)
+pve-exporter/pve.yml
+!pve-exporter/pve.yml.example

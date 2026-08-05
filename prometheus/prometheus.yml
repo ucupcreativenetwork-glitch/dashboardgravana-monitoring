@@ -8,6 +8,7 @@
 # - Relabeling for consistent instance / job / environment labels
 # - File-based service discovery (targets/*.json) — preferred for fleets
 # - Blackbox multi-module probes (HTTP, ICMP, TCP, TLS, DNS)
+# - Proxmox VE via pve-exporter + file_sd (profile: pve)
 # - Support for future Kubernetes SD and federation
 # - Retention and remote_write controlled via command-line / env
 # =============================================================================
@@ -168,7 +169,6 @@ scrape_configs:
 
   # -------------------------------------------------------------------------
   # Blackbox — TLS / SSL certificate (file_sd)
-  # Metrics: probe_ssl_earliest_cert_expiry, probe_success
   # -------------------------------------------------------------------------
   - job_name: blackbox-ssl
     metrics_path: /probe
@@ -216,19 +216,28 @@ scrape_configs:
           service: synthetic
 
   # -------------------------------------------------------------------------
-  # Proxmox VE Exporter
-  # Enable service with: docker compose --profile pve up -d
-  # If pve-exporter is not running, this job will show as down (expected)
+  # Proxmox VE Exporter (profile: pve)
+  # Enable: docker compose --profile pve up -d
+  # Targets = Proxmox API host:8006 in prometheus/targets/pve.json
+  # Exporter proxies metrics; relabel maps API address → pve-exporter:9221
   # -------------------------------------------------------------------------
   - job_name: pve
-    static_configs:
-      - targets: ["pve-exporter:9221"]
-        labels:
-          component: proxmox
-          service: hypervisor
     metrics_path: /pve
     params:
       module: [default]
+      cluster: ["1"]
+      node: ["1"]
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/pve.json
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: pve-exporter:9221
     scrape_timeout: 30s
 
   # -------------------------------------------------------------------------
