@@ -1,0 +1,14 @@
+[Unit]
+Description=Prometheus NUT exporter
+After=network-online.target nut-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nut
+ExecStart=/usr/local/bin/nut_exporter --nut.server=127.0.0.1
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
