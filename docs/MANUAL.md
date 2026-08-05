@@ -16,6 +16,18 @@ Operational handbook for the self-hosted monitoring stack (Grafana · Prometheus
 7. [Security, Backup, Upgrade & HA](manual/07-security-backup-ha.md)
 8. [Operations, Troubleshooting & FAQ](manual/08-operations-faq.md)
 
+## Topic guides (short docs)
+
+| Guide | Path |
+|-------|------|
+| Installation | [INSTALL.md](INSTALL.md) |
+| Grafana | [GRAFANA.md](GRAFANA.md) |
+| Loki | [LOKI.md](LOKI.md) |
+| Alertmanager | [ALERTMANAGER.md](ALERTMANAGER.md) |
+| Discord | [DISCORD.md](DISCORD.md) |
+| Proxmox | [PROXMOX.md](PROXMOX.md) |
+| Troubleshooting | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
+
 Also see: [ARCHITECTURE.md](ARCHITECTURE.md) · [runbooks/](runbooks/) · [SECURITY.md](../SECURITY.md)
 
 ---
