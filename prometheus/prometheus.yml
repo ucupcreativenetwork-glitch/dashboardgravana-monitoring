@@ -1,8 +1,6 @@
 # =============================================================================
-# Prometheus Configuration — DashboardGravana Monitoring Stack
-# file_sd, blackbox multi-module, PVE, optional mysqld/redis exporters
+# Prometheus — DashboardGravana (file_sd + optional host exporters)
 # =============================================================================
-
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -15,8 +13,7 @@ global:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets:
-            - alertmanager:9093
+        - targets: ["alertmanager:9093"]
       timeout: 10s
       api_version: v2
 
@@ -28,43 +25,32 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
-        labels:
-          component: prometheus
-          service: monitoring
+        labels: { component: prometheus, service: monitoring }
 
   - job_name: alertmanager
     static_configs:
       - targets: ["alertmanager:9093"]
-        labels:
-          component: alertmanager
-          service: monitoring
+        labels: { component: alertmanager, service: monitoring }
 
   - job_name: grafana
     metrics_path: /metrics
     static_configs:
       - targets: ["grafana:3000"]
-        labels:
-          component: grafana
-          service: monitoring
+        labels: { component: grafana, service: monitoring }
 
   - job_name: loki
     static_configs:
       - targets: ["loki:3100"]
-        labels:
-          component: loki
-          service: monitoring
+        labels: { component: loki, service: monitoring }
 
   - job_name: blackbox-exporter
     static_configs:
       - targets: ["blackbox-exporter:9115"]
-        labels:
-          component: blackbox
-          service: monitoring
+        labels: { component: blackbox, service: monitoring }
 
   - job_name: node-exporter
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/nodes.json
+      - files: [/etc/prometheus/targets/nodes.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
@@ -74,23 +60,14 @@ scrape_configs:
 
   - job_name: cadvisor
     static_configs:
-      - targets:
-          - cadvisor:8080
-        labels:
-          component: container
-          service: docker
-    metric_relabel_configs:
-      - source_labels: [container_label_com_docker_compose_project]
-        regex: ".+"
-        target_label: compose_project
+      - targets: ["cadvisor:8080"]
+        labels: { component: container, service: docker }
 
   - job_name: blackbox-http
     metrics_path: /probe
-    params:
-      module: [http_2xx]
+    params: { module: [http_2xx] }
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/blackbox-http.json
+      - files: [/etc/prometheus/targets/blackbox-http.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
@@ -99,18 +76,12 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
-      - source_labels: [__param_target]
-        regex: "https?://([^/]+).*"
-        target_label: host
-        replacement: "${1}"
 
   - job_name: blackbox-icmp
     metrics_path: /probe
-    params:
-      module: [icmp]
+    params: { module: [icmp] }
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/blackbox-icmp.json
+      - files: [/etc/prometheus/targets/blackbox-icmp.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
@@ -122,11 +93,9 @@ scrape_configs:
 
   - job_name: blackbox-tcp
     metrics_path: /probe
-    params:
-      module: [tcp_connect]
+    params: { module: [tcp_connect] }
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/blackbox-tcp.json
+      - files: [/etc/prometheus/targets/blackbox-tcp.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
@@ -138,11 +107,9 @@ scrape_configs:
 
   - job_name: blackbox-ssl
     metrics_path: /probe
-    params:
-      module: [tls_connect]
+    params: { module: [tls_connect] }
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/blackbox-ssl.json
+      - files: [/etc/prometheus/targets/blackbox-ssl.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
@@ -154,11 +121,9 @@ scrape_configs:
 
   - job_name: blackbox-dns
     metrics_path: /probe
-    params:
-      module: [dns_a]
+    params: { module: [dns_a] }
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/blackbox-dns.json
+      - files: [/etc/prometheus/targets/blackbox-dns.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
@@ -171,19 +136,13 @@ scrape_configs:
   - job_name: uptime-kuma
     static_configs:
       - targets: ["uptime-kuma:3001"]
-        labels:
-          component: uptime
-          service: synthetic
+        labels: { component: uptime, service: synthetic }
 
   - job_name: pve
     metrics_path: /pve
-    params:
-      module: [default]
-      cluster: ["1"]
-      node: ["1"]
+    params: { module: [default], cluster: ["1"], node: ["1"] }
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/pve.json
+      - files: [/etc/prometheus/targets/pve.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
@@ -196,8 +155,17 @@ scrape_configs:
 
   - job_name: mysqld-exporter
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/mysql.json
+      - files: [/etc/prometheus/targets/mysql.json]
+        refresh_interval: 30s
+
+  - job_name: redis-exporter
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/redis.json]
+        refresh_interval: 30s
+
+  - job_name: windows-exporter
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/windows.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
@@ -205,13 +173,32 @@ scrape_configs:
         regex: "([^:]+):.*"
         replacement: "${1}"
 
-  - job_name: redis-exporter
+  - job_name: nut-exporter
     file_sd_configs:
-      - files:
-          - /etc/prometheus/targets/redis.json
+      - files: [/etc/prometheus/targets/nut.json]
+        refresh_interval: 30s
+
+  - job_name: smartctl
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/smart.json]
+        refresh_interval: 30s
+
+  - job_name: snmp
+    metrics_path: /snmp
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/snmp.json]
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
         target_label: instance
-        regex: "([^:]+):.*"
-        replacement: "${1}"
+      - source_labels: [module]
+        target_label: __param_module
+        regex: "(.+)"
+      - source_labels: [__param_module]
+        regex: "^$"
+        target_label: __param_module
+        replacement: if_mib
+      - target_label: __address__
+        replacement: snmp-exporter:9116
