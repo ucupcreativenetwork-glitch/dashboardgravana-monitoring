@@ -1,18 +1,56 @@
-# Blackbox Exporter modules — production probe definitions
+# =============================================================================
+# Blackbox Exporter — Production probe modules
+# DashboardGravana Monitoring Stack
+#
+# Security:
+# - Prefer fail_if_not_ssl for public HTTPS endpoints
+# - insecure_skip_verify only for lab / internal CA (never for public internet)
+# - ICMP requires NET_RAW capability (already set in docker-compose if needed)
+# =============================================================================
+
 modules:
+  # -------------------------------------------------------------------------
+  # HTTP — expect 2xx
+  # -------------------------------------------------------------------------
   http_2xx:
     prober: http
     timeout: 5s
     http:
       valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
-      valid_status_codes: []  # Defaults to 2xx
+      valid_status_codes: []  # defaults to 2xx
       method: GET
       follow_redirects: true
       fail_if_ssl: false
       fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: true
       tls_config:
         insecure_skip_verify: false
+
+  # Force HTTPS (fail if plain HTTP)
+  http_2xx_ssl:
+    prober: http
+    timeout: 5s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      method: GET
+      follow_redirects: true
+      fail_if_not_ssl: true
       preferred_ip_protocol: "ip4"
+      tls_config:
+        insecure_skip_verify: false
+
+  # Internal / self-signed lab endpoints
+  http_2xx_insecure:
+    prober: http
+    timeout: 5s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      method: GET
+      follow_redirects: true
+      preferred_ip_protocol: "ip4"
+      tls_config:
+        insecure_skip_verify: true
 
   http_post_2xx:
     prober: http
@@ -22,22 +60,68 @@ modules:
       headers:
         Content-Type: application/json
       body: "{}"
+      preferred_ip_protocol: "ip4"
 
+  # -------------------------------------------------------------------------
+  # TCP connect
+  # -------------------------------------------------------------------------
   tcp_connect:
     prober: tcp
     timeout: 5s
+    tcp:
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: true
 
+  # -------------------------------------------------------------------------
+  # TLS / SSL certificate (handshake + cert metrics)
+  # Used by Grafana 22-SSL and certificate expiry alerts
+  # -------------------------------------------------------------------------
+  tls_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: "ip4"
+      tls: true
+      tls_config:
+        insecure_skip_verify: false
+
+  tls_connect_insecure:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: "ip4"
+      tls: true
+      tls_config:
+        insecure_skip_verify: true
+
+  # -------------------------------------------------------------------------
+  # ICMP (ping) — requires CAP_NET_RAW on the exporter container
+  # -------------------------------------------------------------------------
   icmp:
     prober: icmp
     timeout: 5s
     icmp:
       preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: true
 
-  dns:
+  # -------------------------------------------------------------------------
+  # DNS
+  # -------------------------------------------------------------------------
+  dns_a:
     prober: dns
     timeout: 5s
     dns:
       query_name: "example.com"
       query_type: "A"
+      valid_rcodes:
+        - NOERROR
+      preferred_ip_protocol: "ip4"
+
+  dns_aaaa:
+    prober: dns
+    timeout: 5s
+    dns:
+      query_name: "example.com"
+      query_type: "AAAA"
       valid_rcodes:
         - NOERROR
