@@ -1,61 +1,45 @@
-# Installation Guide
+# Installation
 
-> Part of [Manual Book](MANUAL.md) · detailed chapter: [manual/02-installation.md](manual/02-installation.md)
+Production install on **Ubuntu 24.04 LTS**, **Debian 12**, or **Proxmox VE** host.
 
-## Requirements
+## 1. Prerequisites
 
-| Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| OS | Ubuntu 24.04 LTS / Debian 12 / Proxmox VE | Ubuntu 24.04 LTS |
-| CPU | 4 cores | 8+ |
-| RAM | 8 GB | 16–32 GB |
-| Disk | 50 GB SSD | 200+ GB SSD |
-| Software | Docker Engine 24+, Compose v2 plugin | same |
+- Root or sudo
+- 4+ CPU / 8+ GB RAM / 50+ GB disk
+- Outbound HTTPS
 
-## Quick install
+## 2. Clone & configure
 
 ```bash
 git clone https://github.com/ucupcreativenetwork-glitch/dashboardgravana-monitoring.git
 cd dashboardgravana-monitoring
-
 sudo ./scripts/install.sh
-cp .env.example .env
-chmod 600 .env
-nano .env   # set GF_SECURITY_ADMIN_PASSWORD, DISCORD_WEBHOOK_URL
-
-sudo ./scripts/install.sh --start
-# or: docker compose up -d
+cp -n .env.example .env
+nano .env
 ```
 
-## Verify
+Set at least `GF_SECURITY_ADMIN_PASSWORD` and `DISCORD_WEBHOOK_URL`.
+
+## 3. Start
+
+```bash
+./scripts/render-alertmanager-config.sh
+sudo ./scripts/install.sh --start
+```
+
+Optional: `--profile pve` / `--profile exporters`.
+
+## 4. Verify
 
 ```bash
 ./scripts/healthcheck.sh
-docker compose ps
-curl -s http://localhost:9090/-/ready
-curl -s http://localhost:3000/api/health
+curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health}'
 ```
 
-| Service | URL |
-|---------|-----|
-| Grafana | http://localhost:3000 |
-| Prometheus | http://localhost:9090 |
-| Alertmanager | http://localhost:9093 |
-| Uptime Kuma | http://localhost:3001 |
-| Loki | http://localhost:3100 |
+## 5. TLS
 
-## Update / uninstall
+See [REVERSE-PROXY.md](REVERSE-PROXY.md). Use `docker-compose.override.example.yml` for localhost binds.
 
-```bash
-./scripts/update.sh
-./scripts/uninstall.sh          # keep volumes
-./scripts/uninstall.sh --purge  # delete volumes (destructive)
-```
+## Related
 
-## Next steps
-
-1. [GRAFANA.md](GRAFANA.md) — datasources & dashboards  
-2. [PROXMOX.md](PROXMOX.md) — enable PVE exporter  
-3. [DISCORD.md](DISCORD.md) — alert notifications  
-4. [ALERTMANAGER.md](ALERTMANAGER.md) — routing & silences  
-5. [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — common issues  
+- [BACKUP.md](BACKUP.md) · [PROXMOX.md](PROXMOX.md) · [EXPORTERS.md](EXPORTERS.md) · [ALERTMANAGER.md](ALERTMANAGER.md)

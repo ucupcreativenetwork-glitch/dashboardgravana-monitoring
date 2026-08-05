@@ -1,0 +1,10 @@
+[
+  {
+    "targets": ["mysqld-exporter:9104"],
+    "labels": {
+      "env": "production",
+      "component": "mysql",
+      "service": "database"
+    }
+  }
+]
