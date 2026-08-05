@@ -1,0 +1,152 @@
+# =============================================================================
+# Alertmanager Configuration Template — DashboardGravana
+# Render with: ./scripts/render-alertmanager-config.sh
+# (envsubst substitutes ENV VARS from .env — Alertmanager itself does not expand env)
+#
+# Channels: Discord (primary) · Telegram · Email
+# Severity: warning → critical → emergency
+# =============================================================================
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: '${ALERTMANAGER_SMTP_SMARTHOST}'
+  smtp_from: '${ALERTMANAGER_SMTP_FROM}'
+  smtp_auth_username: '${ALERTMANAGER_SMTP_AUTH_USERNAME}'
+  smtp_auth_password: '${ALERTMANAGER_SMTP_AUTH_PASSWORD}'
+  smtp_require_tls: ${ALERTMANAGER_SMTP_REQUIRE_TLS}
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'severity', 'cluster', 'instance']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "emergency"
+      receiver: 'emergency'
+      group_wait: 0s
+      repeat_interval: 15m
+      continue: true
+
+    - matchers:
+        - severity = "critical"
+      receiver: 'critical'
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: true
+
+    - matchers:
+        - severity = "warning"
+      receiver: 'warning'
+      group_wait: 1m
+      repeat_interval: 6h
+
+    - matchers:
+        - team = "security"
+      receiver: 'security'
+      continue: true
+
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ['alertname', 'instance']
+
+  - source_matchers:
+      - severity = "emergency"
+    target_matchers:
+      - severity =~ "critical|warning"
+    equal: ['alertname', 'instance']
+
+  - source_matchers:
+      - alertname = "NodeDown"
+    target_matchers:
+      - alertname =~ ".+"
+    equal: ['instance']
+
+receivers:
+  - name: 'default'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+    telegram_configs:
+      - bot_token: '${TELEGRAM_BOT_TOKEN}'
+        chat_id: ${TELEGRAM_CHAT_ID}
+        message: '{{ template "telegram.message" . }}'
+        parse_mode: 'HTML'
+        send_resolved: true
+        api_url: 'https://api.telegram.org'
+        disable_notifications: false
+
+  - name: 'warning'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+
+  - name: 'critical'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+    telegram_configs:
+      - bot_token: '${TELEGRAM_BOT_TOKEN}'
+        chat_id: ${TELEGRAM_CHAT_ID}
+        message: '{{ template "telegram.message" . }}'
+        parse_mode: 'HTML'
+        send_resolved: true
+        api_url: 'https://api.telegram.org'
+    email_configs:
+      - to: '${ALERTMANAGER_EMAIL_TO}'
+        send_resolved: true
+        headers:
+          Subject: '[CRITICAL {{ .Status | toUpper }}] {{ .CommonAnnotations.summary }}'
+        html: '{{ template "email.html" . }}'
+        require_tls: true
+
+  - name: 'emergency'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+    telegram_configs:
+      - bot_token: '${TELEGRAM_BOT_TOKEN}'
+        chat_id: ${TELEGRAM_CHAT_ID}
+        message: '{{ template "telegram.message" . }}'
+        parse_mode: 'HTML'
+        send_resolved: true
+        api_url: 'https://api.telegram.org'
+        disable_notifications: false
+    email_configs:
+      - to: '${ALERTMANAGER_EMAIL_TO}'
+        send_resolved: true
+        headers:
+          Subject: '[EMERGENCY {{ .Status | toUpper }}] {{ .CommonAnnotations.summary }}'
+        html: '{{ template "email.html" . }}'
+        require_tls: true
+
+  - name: 'security'
+    discord_configs:
+      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+    telegram_configs:
+      - bot_token: '${TELEGRAM_BOT_TOKEN}'
+        chat_id: ${TELEGRAM_CHAT_ID}
+        message: '{{ template "telegram.message" . }}'
+        parse_mode: 'HTML'
+        send_resolved: true
+        api_url: 'https://api.telegram.org'
+
+  - name: 'null'

@@ -1,19 +1,23 @@
-{{ define "discord.title" }}
+{{ define "discord.title" -}}
 {{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }} [{{ .CommonLabels.severity | toUpper }}] {{ .CommonAnnotations.summary }}
-{{ end }}
+{{- end }}
 
-{{ define "discord.message" }}
+{{ define "discord.message" -}}
 **Status:** {{ .Status | toUpper }}
-**Severity:** {{ .CommonLabels.severity }}
-**Cluster:** {{ .CommonLabels.cluster }}
-**Alert:** {{ .CommonLabels.alertname }}
+**Severity:** `{{ .CommonLabels.severity }}`
+**Cluster:** `{{ .CommonLabels.cluster }}`
+**Alert:** `{{ .CommonLabels.alertname }}`
 
-{{ range .Alerts }}
+{{ range .Alerts -}}
 ---
 **Instance:** `{{ .Labels.instance }}`
+{{ if .Labels.job }}**Job:** `{{ .Labels.job }}`
+{{ end -}}
 **Description:** {{ .Annotations.description }}
 **Starts:** {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
-{{ if .Annotations.dashboard_url }}**Dashboard:** {{ .Annotations.dashboard_url }}{{ end }}
-{{ if .Annotations.runbook_url }}**Runbook:** {{ .Annotations.runbook_url }}{{ end }}
+{{ if .Annotations.dashboard_url }}**Dashboard:** {{ .Annotations.dashboard_url }}
+{{ end -}}
+{{ if .Annotations.runbook_url }}**Runbook:** {{ .Annotations.runbook_url }}
 {{ end }}
-{{ end }}
+{{ end -}}
+{{- end }}

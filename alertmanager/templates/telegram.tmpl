@@ -1,9 +1,14 @@
-{{ define "telegram.message" }}
+{{ define "telegram.message" -}}
 {{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} <b>{{ .CommonLabels.severity | toUpper }}</b>
 {{ .CommonAnnotations.summary }}
 
-{{ range .Alerts }}
+{{ range .Alerts -}}
 <b>Instance:</b> <code>{{ .Labels.instance }}</code>
+{{ if .Labels.job }}<b>Job:</b> <code>{{ .Labels.job }}</code>
+{{ end -}}
 {{ .Annotations.description }}
+{{ if .Annotations.dashboard_url }}
+<a href="{{ .Annotations.dashboard_url }}">Dashboard</a>
 {{ end }}
-{{ end }}
+{{ end -}}
+{{- end }}
