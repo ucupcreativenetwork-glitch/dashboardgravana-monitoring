@@ -19,6 +19,7 @@ Production multi-target discovery for DashboardGravana.
 | `blackbox-tcp.json` | TCP port connectivity |
 | `blackbox-ssl.json` | TLS certificate expiry / handshake |
 | `blackbox-dns.json` | DNS resolution checks |
+| `pve.json` | Proxmox API endpoints (`host:8006`) |
 
 ## JSON format
 
@@ -47,6 +48,10 @@ Prometheus expects a list of groups:
 3. Append to `nodes.json`.
 4. Wait ≤30s — target appears in Prometheus → Status → Targets.
 
+## Proxmox API targets
+
+Edit `pve.json` with `host:8006` (API), not the exporter port. See `docs/PROXMOX.md`.
+
 ## Security
 
 - Never put secrets in target labels.
@@ -64,4 +69,5 @@ curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job,
 ## Related
 
 - `docs/BLACKBOX.md` — probe modules and alert wiring
-- Grafana dashboards **13-Internet**, **22-SSL**, **11-Network**
+- `docs/PROXMOX.md` — PVE exporter profile
+- Grafana dashboards **13-Internet**, **22-SSL**, **06–09 Proxmox**

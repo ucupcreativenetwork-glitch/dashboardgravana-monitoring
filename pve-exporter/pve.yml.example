@@ -1,7 +1,31 @@
-# Copy to pve.yml. Prefer API tokens over passwords.
+# =============================================================================
+# Proxmox VE Exporter configuration (EXAMPLE)
+# Copy to pve.yml and fill credentials. Never commit pve.yml with real secrets.
+#
+#   cp pve-exporter/pve.yml.example pve-exporter/pve.yml
+#   chmod 600 pve-exporter/pve.yml
+#
+# Prefer API tokens (PVEAuditor) over passwords.
+# Create in Proxmox UI: Datacenter → Permissions → API Tokens
+# =============================================================================
+
 default:
+  # Format: user@realm (e.g. monitoring@pve or monitoring@pam)
   user: monitoring@pve
-  # token_name: monitoring
-  # token_value: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  password: CHANGE_ME
-  verify_ssl: true
+
+  # --- Recommended: API token (leave password empty) ---
+  token_name: monitoring
+  token_value: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+  # --- Alternative: password (discouraged for production) ---
+  # password: "CHANGE_ME"
+
+  # Set true when Proxmox uses a trusted CA / valid certificate
+  verify_ssl: false
+
+# Optional: additional modules for multi-cluster (different credentials)
+# cluster-b:
+#   user: monitoring@pve
+#   token_name: monitoring
+#   token_value: "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"
+#   verify_ssl: false
