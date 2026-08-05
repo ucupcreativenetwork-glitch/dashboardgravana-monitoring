@@ -1,15 +1,18 @@
 ---
 name: Feature request
-about: Suggest an improvement
-title: "[FEATURE] "
+about: Propose an improvement for DashboardGravana
+title: "[feat] "
 labels: enhancement
-assignees: ''
 ---
 
-**Problem / Motivation**
+## Problem
 
-**Proposed solution**
+## Proposal
 
-**Alternatives considered**
+## Scope
 
-**Additional context**
+- [ ] Dashboard only
+- [ ] Prometheus rules / scrape
+- [ ] Compose service / profile
+- [ ] Docs / runbooks
+- [ ] CI

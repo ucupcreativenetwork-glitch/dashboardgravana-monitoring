@@ -1,28 +1,31 @@
 ---
 name: Bug report
-about: Report a reproducible bug
-title: "[BUG] "
+about: Something is broken in the stack or docs
+title: "[bug] "
 labels: bug
-assignees: ''
 ---
 
-**Describe the bug**
-A clear description of what is wrong.
+## Summary
 
-**Environment**
-- OS / Distro:
+## Environment
+
+- OS / Proxmox version:
 - Docker / Compose version:
-- Stack version / commit:
-- Relevant exporters:
+- Commit / tag:
+- Profiles enabled (`pve`, `exporters`, …):
 
-**To Reproduce**
-Steps to reproduce.
+## Steps to reproduce
 
-**Expected behavior**
+## Expected vs actual
 
-**Logs / Screenshots**
+## Logs
+
+```bash
+docker compose logs --tail=100 SERVICE_NAME
 ```
-paste relevant logs
-```
 
-**Additional context**
+## Already tried
+
+- [ ] `./scripts/healthcheck.sh`
+- [ ] `docker compose config`
+- [ ] Prometheus → Status → Targets

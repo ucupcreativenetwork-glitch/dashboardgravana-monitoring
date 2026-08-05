@@ -1,51 +1,34 @@
 # Roadmap — DashboardGravana Monitoring
 
-Self-hosted observability platform for HomeLab, SMB, Enterprise, and Datacenter.
-
 ## Done (current main)
 
 - [x] Core stack: Grafana 11, Prometheus, Alertmanager, Loki, Promtail, node-exporter, cAdvisor, blackbox, Uptime Kuma
-- [x] 35 production Grafana dashboards (rich panels, stable UIDs)
+- [x] 35 production Grafana dashboards
 - [x] Prometheus rules + recording rules
-- [x] file_sd targets (nodes, blackbox, PVE API)
-- [x] PVE exporter profile (`--profile pve`)
+- [x] file_sd targets (nodes, blackbox, PVE, mysql, redis)
+- [x] PVE profile + exporters profile (mysqld, redis)
 - [x] Alertmanager Discord + Telegram + Email (envsubst)
-- [x] Install / update / backup / restore / healthcheck scripts
-- [x] CI: YAML, JSON, compose, shellcheck, promtool, secrets scan
-- [x] Docs: INSTALL, ARCHITECTURE, PROXMOX, BLACKBOX, ALERTMANAGER, TELEGRAM, REVERSE-PROXY, BACKUP
+- [x] Install / update / backup / restore / healthcheck
+- [x] CI validation gates
+- [x] Docs: INSTALL, REVERSE-PROXY, BACKUP, PROXMOX, BLACKBOX, EXPORTERS, ALERTMANAGER, TELEGRAM, ROADMAP
+- [x] Stable Grafana datasource UIDs + provisioning
 
 ## Near term
 
-- [ ] Optional Compose profiles for MySQL/MariaDB, Redis, SNMP, NUT, SMART exporters
-- [ ] Grafana provisioning hardening (folders, home dashboard)
+- [ ] Host-side NUT / SMART / SNMP exporter recipes with sample file_sd
+- [ ] Grafana folder permissions / default home dashboard
 - [ ] Alertmanager HA pair example
-- [ ] Prometheus remote_write examples (Mimir / Thanos)
-- [ ] Windows Exporter scrape + dashboard polish
-- [ ] Screenshot pipeline for `assets/screenshots/`
+- [ ] remote_write examples (Mimir / Thanos)
+- [ ] Windows Exporter targets pack
+- [ ] Screenshot pipeline for assets/
 
 ## Medium term
 
-- [ ] Helm chart / Kubernetes manifests
-- [ ] Ansible role for multi-node agents
-- [ ] SSO examples (Authelia, Keycloak, Authentik)
-- [ ] Capacity-planning recording rules pack
-
-## Long term
-
-- [ ] Optional eBPF / continuous profiling
-- [ ] Multi-tenant org documentation
-- [ ] Signed release tags
+- [ ] Helm / Kubernetes manifests
+- [ ] Ansible multi-node agents
+- [ ] SSO examples (Authelia / Keycloak / Authentik)
 
 ## Non-goals
 
-- Replacing full commercial APM as primary product
-- Proprietary agent binaries
+- Proprietary agents
 - Committing live secrets or fake demo metrics as production truth
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Keep CI (`Validate`) green.
-
-## Versioning
-
-Semantic Versioning. Breaking Compose renames → major; new dashboards/rules/docs → minor; fixes → patch.
