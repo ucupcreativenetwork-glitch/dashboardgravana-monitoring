@@ -1,113 +1,152 @@
 # =============================================================================
-# Alertmanager Configuration — DashboardGravana
-# Production routing, grouping, inhibition, and multi-channel notifications.
+# Alertmanager Configuration Template — DashboardGravana
+# Render with: ./scripts/render-alertmanager-config.sh
+# (envsubst substitutes ENV VARS from .env — Alertmanager itself does not expand env)
 #
-# Channels: Discord (primary), Telegram, Email, Webhook
+# Channels: Discord (primary) · Telegram · Email
 # Severity: warning → critical → emergency
 # =============================================================================
 
 global:
   resolve_timeout: 5m
-  smtp_smarthost: '${ALERTMANAGER_SMTP_SMARTHOST}'
-  smtp_from: '${ALERTMANAGER_SMTP_FROM}'
-  smtp_auth_username: '${ALERTMANAGER_SMTP_AUTH_USERNAME}'
-  smtp_auth_password: '${ALERTMANAGER_SMTP_AUTH_PASSWORD}'
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'alertmanager@example.com'
+  smtp_auth_username: ''
+  smtp_auth_password: ''
   smtp_require_tls: true
 
 templates:
   - '/etc/alertmanager/templates/*.tmpl'
 
 route:
-  receiver: 'discord-default'
+  receiver: 'default'
   group_by: ['alertname', 'severity', 'cluster', 'instance']
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
   routes:
-    # Emergency — immediate, no grouping delay
-    - match:
-        severity: emergency
-      receiver: 'discord-emergency'
+    - matchers:
+        - severity = "emergency"
+      receiver: 'emergency'
       group_wait: 0s
       repeat_interval: 15m
       continue: true
 
-    # Critical
-    - match:
-        severity: critical
-      receiver: 'discord-critical'
+    - matchers:
+        - severity = "critical"
+      receiver: 'critical'
       group_wait: 10s
       repeat_interval: 1h
       continue: true
 
-    # Warning
-    - match:
-        severity: warning
-      receiver: 'discord-warning'
+    - matchers:
+        - severity = "warning"
+      receiver: 'warning'
       group_wait: 1m
       repeat_interval: 6h
 
-    # Team-based routing examples
-    - match:
-        team: security
-      receiver: 'discord-security'
+    - matchers:
+        - team = "security"
+      receiver: 'security'
       continue: true
 
 inhibit_rules:
-  # Critical inhibits warning for same alertname + instance
-  - source_match:
-      severity: critical
-    target_match:
-      severity: warning
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
     equal: ['alertname', 'instance']
 
-  - source_match:
-      severity: emergency
-    target_match_re:
-      severity: 'critical|warning'
+  - source_matchers:
+      - severity = "emergency"
+    target_matchers:
+      - severity =~ "critical|warning"
     equal: ['alertname', 'instance']
 
-  # NodeDown inhibits all other alerts from that instance
-  - source_match:
-      alertname: NodeDown
-    target_match_re:
-      alertname: '.+'
+  - source_matchers:
+      - alertname = "NodeDown"
+    target_matchers:
+      - alertname =~ ".+"
     equal: ['instance']
 
 receivers:
-  - name: 'discord-default'
+  - name: 'default'
     discord_configs:
-      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
+        title: '{{ template "discord.title" . }}'
+        message: '{{ template "discord.message" . }}'
+        send_resolved: true
+    telegram_configs:
+      - bot_token: '0000000000:CHANGE_ME_TELEGRAM_BOT_TOKEN'
+        chat_id: 0
+        message: '{{ template "telegram.message" . }}'
+        parse_mode: 'HTML'
+        send_resolved: true
+        api_url: 'https://api.telegram.org'
+        disable_notifications: false
+
+  - name: 'warning'
+    discord_configs:
+      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
         title: '{{ template "discord.title" . }}'
         message: '{{ template "discord.message" . }}'
         send_resolved: true
 
-  - name: 'discord-warning'
+  - name: 'critical'
     discord_configs:
-      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
         title: '{{ template "discord.title" . }}'
         message: '{{ template "discord.message" . }}'
         send_resolved: true
+    telegram_configs:
+      - bot_token: '0000000000:CHANGE_ME_TELEGRAM_BOT_TOKEN'
+        chat_id: 0
+        message: '{{ template "telegram.message" . }}'
+        parse_mode: 'HTML'
+        send_resolved: true
+        api_url: 'https://api.telegram.org'
+    email_configs:
+      - to: 'oncall@example.com'
+        send_resolved: true
+        headers:
+          Subject: '[CRITICAL {{ .Status | toUpper }}] {{ .CommonAnnotations.summary }}'
+        html: '{{ template "email.html" . }}'
+        require_tls: true
 
-  - name: 'discord-critical'
+  - name: 'emergency'
     discord_configs:
-      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
         title: '{{ template "discord.title" . }}'
         message: '{{ template "discord.message" . }}'
         send_resolved: true
+    telegram_configs:
+      - bot_token: '0000000000:CHANGE_ME_TELEGRAM_BOT_TOKEN'
+        chat_id: 0
+        message: '{{ template "telegram.message" . }}'
+        parse_mode: 'HTML'
+        send_resolved: true
+        api_url: 'https://api.telegram.org'
+        disable_notifications: false
+    email_configs:
+      - to: 'oncall@example.com'
+        send_resolved: true
+        headers:
+          Subject: '[EMERGENCY {{ .Status | toUpper }}] {{ .CommonAnnotations.summary }}'
+        html: '{{ template "email.html" . }}'
+        require_tls: true
 
-  - name: 'discord-emergency'
+  - name: 'security'
     discord_configs:
-      - webhook_url: '${DISCORD_WEBHOOK_URL}'
+      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
         title: '{{ template "discord.title" . }}'
         message: '{{ template "discord.message" . }}'
         send_resolved: true
-
-  - name: 'discord-security'
-    discord_configs:
-      - webhook_url: '${DISCORD_WEBHOOK_URL}'
-        title: '{{ template "discord.title" . }}'
-        message: '{{ template "discord.message" . }}'
+    telegram_configs:
+      - bot_token: '0000000000:CHANGE_ME_TELEGRAM_BOT_TOKEN'
+        chat_id: 0
+        message: '{{ template "telegram.message" . }}'
+        parse_mode: 'HTML'
         send_resolved: true
+        api_url: 'https://api.telegram.org'
 
   - name: 'null'
