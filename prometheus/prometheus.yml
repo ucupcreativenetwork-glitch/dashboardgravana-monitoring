@@ -1,16 +1,6 @@
 # =============================================================================
 # Prometheus Configuration — DashboardGravana Monitoring Stack
-# Production-ready scrape configuration with multi-target support,
-# file_sd, recording rules, alert rules, and federation readiness.
-#
-# Design principles:
-# - Explicit job labels for every target class
-# - Relabeling for consistent instance / job / environment labels
-# - File-based service discovery (targets/*.json) — preferred for fleets
-# - Blackbox multi-module probes (HTTP, ICMP, TCP, TLS, DNS)
-# - Proxmox VE via pve-exporter + file_sd (profile: pve)
-# - Support for future Kubernetes SD and federation
-# - Retention and remote_write controlled via command-line / env
+# file_sd, blackbox multi-module, PVE, optional mysqld/redis exporters
 # =============================================================================
 
 global:
@@ -22,7 +12,6 @@ global:
     environment: production
     monitor: dashboardgravana-stack
 
-# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
@@ -31,15 +20,11 @@ alerting:
       timeout: 10s
       api_version: v2
 
-# Rule files — alert + recording
 rule_files:
   - /etc/prometheus/rules/*.yml
   - /etc/prometheus/recording/*.yml
 
 scrape_configs:
-  # -------------------------------------------------------------------------
-  # Self-monitoring
-  # -------------------------------------------------------------------------
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
@@ -76,10 +61,6 @@ scrape_configs:
           component: blackbox
           service: monitoring
 
-  # -------------------------------------------------------------------------
-  # Host metrics — Node Exporter (file_sd preferred for multi-node)
-  # Edit prometheus/targets/nodes.json to add hosts without restart
-  # -------------------------------------------------------------------------
   - job_name: node-exporter
     file_sd_configs:
       - files:
@@ -91,9 +72,6 @@ scrape_configs:
         regex: "([^:]+):.*"
         replacement: "${1}"
 
-  # -------------------------------------------------------------------------
-  # Container metrics — cAdvisor
-  # -------------------------------------------------------------------------
   - job_name: cadvisor
     static_configs:
       - targets:
@@ -106,9 +84,6 @@ scrape_configs:
         regex: ".+"
         target_label: compose_project
 
-  # -------------------------------------------------------------------------
-  # Blackbox — HTTP probes (file_sd)
-  # -------------------------------------------------------------------------
   - job_name: blackbox-http
     metrics_path: /probe
     params:
@@ -129,9 +104,6 @@ scrape_configs:
         target_label: host
         replacement: "${1}"
 
-  # -------------------------------------------------------------------------
-  # Blackbox — ICMP probes (file_sd)
-  # -------------------------------------------------------------------------
   - job_name: blackbox-icmp
     metrics_path: /probe
     params:
@@ -148,9 +120,6 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # -------------------------------------------------------------------------
-  # Blackbox — TCP connect (file_sd)
-  # -------------------------------------------------------------------------
   - job_name: blackbox-tcp
     metrics_path: /probe
     params:
@@ -167,9 +136,6 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # -------------------------------------------------------------------------
-  # Blackbox — TLS / SSL certificate (file_sd)
-  # -------------------------------------------------------------------------
   - job_name: blackbox-ssl
     metrics_path: /probe
     params:
@@ -186,9 +152,6 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # -------------------------------------------------------------------------
-  # Blackbox — DNS (file_sd)
-  # -------------------------------------------------------------------------
   - job_name: blackbox-dns
     metrics_path: /probe
     params:
@@ -205,9 +168,6 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # -------------------------------------------------------------------------
-  # Uptime Kuma
-  # -------------------------------------------------------------------------
   - job_name: uptime-kuma
     static_configs:
       - targets: ["uptime-kuma:3001"]
@@ -215,12 +175,6 @@ scrape_configs:
           component: uptime
           service: synthetic
 
-  # -------------------------------------------------------------------------
-  # Proxmox VE Exporter (profile: pve)
-  # Enable: docker compose --profile pve up -d
-  # Targets = Proxmox API host:8006 in prometheus/targets/pve.json
-  # Exporter proxies metrics; relabel maps API address → pve-exporter:9221
-  # -------------------------------------------------------------------------
   - job_name: pve
     metrics_path: /pve
     params:
@@ -240,16 +194,24 @@ scrape_configs:
         replacement: pve-exporter:9221
     scrape_timeout: 30s
 
-  # -------------------------------------------------------------------------
-  # Federation (multi-Prometheus / hierarchical setup)
-  # -------------------------------------------------------------------------
-  # - job_name: federate
-  #   scrape_interval: 30s
-  #   honor_labels: true
-  #   metrics_path: /federate
-  #   params:
-  #     match[]:
-  #       - '{job=~".+"}'
-  #   static_configs:
-  #     - targets:
-  #         - prometheus-remote:9090
+  - job_name: mysqld-exporter
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/mysql.json
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: "([^:]+):.*"
+        replacement: "${1}"
+
+  - job_name: redis-exporter
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/redis.json
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: "([^:]+):.*"
+        replacement: "${1}"
