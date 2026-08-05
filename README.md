@@ -8,10 +8,12 @@ Similar in capability to Datadog, Zabbix, PRTG, Grafana Cloud, Prometheus Operat
 
 ## Documentation
 
-- **[Manual Book](docs/MANUAL.md)** — installation, configuration, operations, troubleshooting, FAQ
-- **[Full Manual (single file)](docs/MANUAL-FULL.md)** — complete handbook in one document
+- **[Manual Book](docs/MANUAL.md)** — full installation, configuration, operations, FAQ
 - [Architecture](docs/ARCHITECTURE.md)
-- [Runbooks](docs/runbooks/)
+- [Install](docs/INSTALL.md) · [Reverse Proxy & TLS](docs/REVERSE-PROXY.md) · [Backup & DR](docs/BACKUP.md)
+- [Proxmox](docs/PROXMOX.md) · [Blackbox](docs/BLACKBOX.md) · [Alertmanager](docs/ALERTMANAGER.md) · [Telegram](docs/TELEGRAM.md) · [Discord](docs/DISCORD.md)
+- [Runbooks](docs/runbooks/) · [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
 
 ---
 
@@ -51,7 +53,8 @@ Similar in capability to Datadog, Zabbix, PRTG, Grafana Cloud, Prometheus Operat
 | Loki single-binary | Sufficient for most sites |
 | Alertmanager clustering prepared | HA-ready flags |
 | Recording rules | Fast dashboards, lower query load |
-| Secrets via `.env` | Simple; migrate to Vault when needed |
+| file_sd targets | Multi-node without editing prometheus.yml |
+| Secrets via `.env` + envsubst for AM | Alertmanager does not expand env natively |
 | Resource limits + healthchecks | Protect the monitoring host |
 
 ---
@@ -73,10 +76,11 @@ cd dashboardgravana-monitoring
 
 sudo ./scripts/install.sh
 cp .env.example .env
-nano .env   # set GF_SECURITY_ADMIN_PASSWORD, DISCORD_WEBHOOK_URL, etc.
+nano .env   # GF_SECURITY_ADMIN_PASSWORD, DISCORD_WEBHOOK_URL, Telegram, SMTP…
 
 sudo ./scripts/install.sh --start
 # or: docker compose up -d
+# Proxmox: docker compose --profile pve up -d
 ```
 
 | Service | Default URL |
@@ -87,13 +91,13 @@ sudo ./scripts/install.sh --start
 | Uptime Kuma | http://localhost:3001 |
 | Loki | http://localhost:3100 |
 
-Credentials: from `.env`. Full steps: **[Manual Book](docs/MANUAL.md)**.
+Credentials: from `.env`. TLS: [docs/REVERSE-PROXY.md](docs/REVERSE-PROXY.md).
 
 ---
 
 ## Dashboards
 
-**35 production dashboards** auto-provisioned under `grafana/dashboards/`.
+**35 production dashboards** under `grafana/dashboards/` (auto-provisioned).
 
 | Range | Coverage |
 |-------|----------|
@@ -105,15 +109,15 @@ Credentials: from `.env`. Full steps: **[Manual Book](docs/MANUAL.md)**.
 | 27–31 | Temperature, SMART, Backup, Logs, Audit |
 | 32–35 | Performance, Capacity, Business, Datacenter |
 
-Details: [docs/manual/04-dashboards.md](docs/manual/04-dashboards.md).
-
 ---
 
 ## Configuration
 
-Driven by `.env` (see `.env.example`). Critical: `GF_SECURITY_ADMIN_PASSWORD`, `DISCORD_WEBHOOK_URL`, optional Telegram/SMTP/PVE vars.
+Driven by `.env` (see `.env.example`).
 
-Adding targets: prefer `prometheus/targets/*.json` with file_sd. Proxmox: see [Manual ch.06](docs/manual/06-exporters-proxmox-notifications.md).
+- **Targets:** `prometheus/targets/*.json` (file_sd) — nodes, blackbox, PVE API
+- **Alerts:** render with `./scripts/render-alertmanager-config.sh` after editing `.env`
+- **Proxmox:** [docs/PROXMOX.md](docs/PROXMOX.md)
 
 ---
 
@@ -121,62 +125,47 @@ Adding targets: prefer `prometheus/targets/*.json` with file_sd. Proxmox: see [M
 
 ```bash
 ./scripts/backup.sh
-./scripts/restore.sh <archive.tar.gz>
+./scripts/restore.sh backup/dg-backup-YYYYMMDD-HHMMSS.tar.gz
 ```
+
+Details: [docs/BACKUP.md](docs/BACKUP.md).
 
 ---
 
 ## Security
 
-See [SECURITY.md](SECURITY.md). Never commit `.env`. TLS at the edge. Least-privilege exporters.
+See [SECURITY.md](SECURITY.md). Never commit `.env`. TLS at the edge. Least-privilege exporters. CI scans for private keys.
 
 ---
 
 ## Scaling & HA
 
-Federation, remote_write (Thanos/Mimir), Loki object storage, Helm (roadmap). Alertmanager clustering flags already set.
+Federation, remote_write (Thanos/Mimir), Loki object storage, Helm — see [ROADMAP.md](ROADMAP.md). Alertmanager clustering flags already set.
 
 ---
 
 ## Upgrade
 
 ```bash
-git pull && docker compose pull && docker compose up -d
+./scripts/update.sh
+# or: git pull && docker compose pull && docker compose up -d
 ```
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Check |
-|---------|-------|
-| Empty Grafana panels | Prometheus targets / recording rules |
-| No Discord alerts | Webhook URL, Alertmanager logs |
-| Node metrics missing | node-exporter, firewall |
-
 ```bash
+./scripts/healthcheck.sh
 docker compose logs -f grafana prometheus alertmanager
 curl -s localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job, health}'
 ```
-
-Full guide: [ch.08](docs/manual/08-operations-faq.md).
-
----
-
-## Roadmap
-
-- [x] Full set of 35 enterprise dashboards
-- [x] Manual Book (operations handbook)
-- [ ] Exporters fully wired (PVE / edge network / UPS)
-- [ ] Helm chart + Kubernetes manifests
-- [ ] Thanos / Mimir optional profile
-- [ ] Ansible / Terraform modules
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Keep the **Validate** workflow green.
 
 ## License
 
