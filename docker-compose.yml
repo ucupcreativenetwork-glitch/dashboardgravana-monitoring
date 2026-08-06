@@ -1,8 +1,4 @@
-# =============================================================================
-# DashboardGravana Monitoring Stack — Docker Compose
-# Profiles: default | pve | exporters
-# =============================================================================
-
+# DashboardGravana — Docker Compose (profiles: default | pve | exporters | snmp)
 x-logging: &default-logging
   driver: json-file
   options:
@@ -25,14 +21,13 @@ services:
       GF_USERS_ALLOW_SIGN_UP: ${GF_USERS_ALLOW_SIGN_UP:-false}
       GF_AUTH_ANONYMOUS_ENABLED: ${GF_AUTH_ANONYMOUS_ENABLED:-false}
       GF_SERVER_ROOT_URL: ${GF_SERVER_ROOT_URL:-http://localhost:3000}
-      GF_INSTALL_PLUGINS: ${GF_INSTALL_PLUGINS:-}
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - monitoring
+      - ./grafana/config/grafana.ini:/etc/grafana/grafana.ini:ro
+    networks: [monitoring]
     depends_on:
       prometheus:
         condition: service_healthy
@@ -47,11 +42,6 @@ services:
       retries: 3
       start_period: 40s
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
-          memory: 2G
 
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -66,15 +56,13 @@ services:
       - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-50GB}
       - --web.enable-lifecycle
       - --web.enable-admin-api
-      - --web.enable-remote-write-receiver
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/rules:/etc/prometheus/rules:ro
       - ./prometheus/recording:/etc/prometheus/recording:ro
       - ./prometheus/targets:/etc/prometheus/targets:ro
       - prometheus_data:/prometheus
-    networks:
-      - monitoring
+    networks: [monitoring]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -83,11 +71,6 @@ services:
       timeout: 10s
       retries: 3
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          cpus: "4.0"
-          memory: 8G
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
@@ -103,8 +86,7 @@ services:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
       - --cluster.listen-address=0.0.0.0:9094
-    networks:
-      - monitoring
+    networks: [monitoring]
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9093/-/healthy || exit 1"]
       interval: 30s
@@ -122,8 +104,7 @@ services:
       - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - monitoring
+    networks: [monitoring]
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
       interval: 30s
@@ -141,8 +122,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: -config.file=/etc/promtail/config.yml
-    networks:
-      - monitoring
+    networks: [monitoring]
     depends_on:
       loki:
         condition: service_healthy
@@ -159,14 +139,11 @@ services:
       - --path.sysfs=/host/sys
       - --path.rootfs=/rootfs
       - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
-      - --collector.systemd
-      - --collector.processes
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
-    networks:
-      - monitoring
+    networks: [monitoring]
     pid: host
     logging: *default-logging
 
@@ -182,11 +159,9 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
-    networks:
-      - monitoring
+    networks: [monitoring]
     privileged: true
-    devices:
-      - /dev/kmsg
+    devices: [/dev/kmsg]
     logging: *default-logging
 
   blackbox-exporter:
@@ -197,12 +172,9 @@ services:
       - "${BLACKBOX_EXPORTER_PORT:-9115}:9115"
     volumes:
       - ./prometheus/blackbox.yml:/config/blackbox.yml:ro
-    command:
-      - --config.file=/config/blackbox.yml
-    cap_add:
-      - NET_RAW
-    networks:
-      - monitoring
+    command: [--config.file=/config/blackbox.yml]
+    cap_add: [NET_RAW]
+    networks: [monitoring]
     logging: *default-logging
 
   uptime-kuma:
@@ -213,8 +185,7 @@ services:
       - "${UPTIME_KUMA_PORT:-3001}:3001"
     volumes:
       - uptime_kuma_data:/app/data
-    networks:
-      - monitoring
+    networks: [monitoring]
     logging: *default-logging
 
   pve-exporter:
@@ -225,44 +196,51 @@ services:
       - "${PVE_EXPORTER_PORT:-9221}:9221"
     volumes:
       - ./pve-exporter/pve.yml:/etc/prometheus/pve.yml:ro
-    command:
-      - --config.file=/etc/prometheus/pve.yml
+    command: [--config.file=/etc/prometheus/pve.yml]
     environment:
       PVE_USER: ${PVE_USER:-monitoring@pve}
       PVE_PASSWORD: ${PVE_PASSWORD:-}
       PVE_TOKEN_NAME: ${PVE_TOKEN_NAME:-}
       PVE_TOKEN_VALUE: ${PVE_TOKEN_VALUE:-}
-    networks:
-      - monitoring
-    profiles:
-      - pve
-      - proxmox
+    networks: [monitoring]
+    profiles: [pve, proxmox]
     logging: *default-logging
 
   mysqld-exporter:
     image: prom/mysqld-exporter:v0.15.1
     container_name: dg-mysqld-exporter
     <<: *default-restart
-    profiles: ["exporters"]
+    profiles: [exporters]
     ports:
       - "${MYSQLD_EXPORTER_PORT:-9104}:9104"
     environment:
       DATA_SOURCE_NAME: "${MYSQL_EXPORTER_DSN:-monitoring:CHANGE_ME@(mariadb:3306)/}"
-    networks:
-      - monitoring
+    networks: [monitoring]
     logging: *default-logging
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.62.0
     container_name: dg-redis-exporter
     <<: *default-restart
-    profiles: ["exporters"]
+    profiles: [exporters]
     ports:
       - "${REDIS_EXPORTER_PORT:-9121}:9121"
     environment:
       REDIS_ADDR: "${REDIS_EXPORTER_ADDR:-redis://redis:6379}"
-    networks:
-      - monitoring
+    networks: [monitoring]
+    logging: *default-logging
+
+  snmp-exporter:
+    image: prom/snmp-exporter:v0.26.0
+    container_name: dg-snmp-exporter
+    <<: *default-restart
+    profiles: [snmp]
+    ports:
+      - "${SNMP_EXPORTER_PORT:-9116}:9116"
+    volumes:
+      - ./snmp-exporter/snmp.yml:/etc/snmp_exporter/snmp.yml:ro
+    command: [--config.file=/etc/snmp_exporter/snmp.yml]
+    networks: [monitoring]
     logging: *default-logging
 
 networks:
