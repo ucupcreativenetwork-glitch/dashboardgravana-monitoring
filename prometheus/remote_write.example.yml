@@ -1,0 +1,8 @@
+# Merge under prometheus.yml top-level remote_write: when backend exists
+# remote_write:
+#   - url: https://mimir.example.com/api/v1/push
+#     name: mimir
+#     queue_config:
+#       capacity: 10000
+#       max_samples_per_send: 5000
+#     # basic_auth / tls_config / write_relabel_configs ...

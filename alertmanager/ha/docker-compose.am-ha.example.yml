@@ -1,0 +1,38 @@
+services:
+  alertmanager-1:
+    image: prom/alertmanager:v0.27.0
+    container_name: dg-alertmanager-1
+    restart: unless-stopped
+    ports: ["9093:9093"]
+    volumes:
+      - ../alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../templates:/etc/alertmanager/templates:ro
+      - am1_data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=0.0.0.0:9094
+      - --cluster.peer=alertmanager-2:9094
+    networks: [monitoring]
+  alertmanager-2:
+    image: prom/alertmanager:v0.27.0
+    container_name: dg-alertmanager-2
+    restart: unless-stopped
+    ports: ["9095:9093"]
+    volumes:
+      - ../alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../templates:/etc/alertmanager/templates:ro
+      - am2_data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=0.0.0.0:9094
+      - --cluster.peer=alertmanager-1:9094
+    networks: [monitoring]
+volumes:
+  am1_data:
+  am2_data:
+networks:
+  monitoring:
+    external: true
+    name: dashboardgravana_monitoring
