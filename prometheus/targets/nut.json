@@ -1,12 +1,1 @@
-[
-  {
-    "targets": [
-      "nut-exporter:9199"
-    ],
-    "labels": {
-      "env": "production",
-      "component": "ups",
-      "service": "power"
-    }
-  }
-]
+[]

@@ -1,25 +1,13 @@
-# =============================================================================
-# Alertmanager Configuration Template — DashboardGravana
-# Render with: ./scripts/render-alertmanager-config.sh
-# (envsubst substitutes ENV VARS from .env — Alertmanager itself does not expand env)
-#
-# Channels: Discord (primary) · Telegram · Email
-# Severity: warning → critical → emergency
-# =============================================================================
-
+# Safe default — starts without external webhooks.
+# Multi-channel: ./scripts/render-alertmanager-config.sh from alertmanager.yml.tmpl
 global:
   resolve_timeout: 5m
-  smtp_smarthost: 'smtp.example.com:587'
-  smtp_from: 'alertmanager@example.com'
-  smtp_auth_username: ''
-  smtp_auth_password: ''
-  smtp_require_tls: true
 
 templates:
   - '/etc/alertmanager/templates/*.tmpl'
 
 route:
-  receiver: 'default'
+  receiver: 'null'
   group_by: ['alertname', 'severity', 'cluster', 'instance']
   group_wait: 30s
   group_interval: 5m
@@ -27,28 +15,19 @@ route:
   routes:
     - matchers:
         - severity = "emergency"
-      receiver: 'emergency'
+      receiver: 'null'
       group_wait: 0s
       repeat_interval: 15m
-      continue: true
-
     - matchers:
         - severity = "critical"
-      receiver: 'critical'
+      receiver: 'null'
       group_wait: 10s
       repeat_interval: 1h
-      continue: true
-
     - matchers:
         - severity = "warning"
-      receiver: 'warning'
+      receiver: 'null'
       group_wait: 1m
       repeat_interval: 6h
-
-    - matchers:
-        - team = "security"
-      receiver: 'security'
-      continue: true
 
 inhibit_rules:
   - source_matchers:
@@ -56,13 +35,11 @@ inhibit_rules:
     target_matchers:
       - severity = "warning"
     equal: ['alertname', 'instance']
-
   - source_matchers:
       - severity = "emergency"
     target_matchers:
       - severity =~ "critical|warning"
     equal: ['alertname', 'instance']
-
   - source_matchers:
       - alertname = "NodeDown"
     target_matchers:
@@ -70,83 +47,4 @@ inhibit_rules:
     equal: ['instance']
 
 receivers:
-  - name: 'default'
-    discord_configs:
-      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
-        title: '{{ template "discord.title" . }}'
-        message: '{{ template "discord.message" . }}'
-        send_resolved: true
-    telegram_configs:
-      - bot_token: '0000000000:CHANGE_ME_TELEGRAM_BOT_TOKEN'
-        chat_id: 0
-        message: '{{ template "telegram.message" . }}'
-        parse_mode: 'HTML'
-        send_resolved: true
-        api_url: 'https://api.telegram.org'
-        disable_notifications: false
-
-  - name: 'warning'
-    discord_configs:
-      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
-        title: '{{ template "discord.title" . }}'
-        message: '{{ template "discord.message" . }}'
-        send_resolved: true
-
-  - name: 'critical'
-    discord_configs:
-      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
-        title: '{{ template "discord.title" . }}'
-        message: '{{ template "discord.message" . }}'
-        send_resolved: true
-    telegram_configs:
-      - bot_token: '0000000000:CHANGE_ME_TELEGRAM_BOT_TOKEN'
-        chat_id: 0
-        message: '{{ template "telegram.message" . }}'
-        parse_mode: 'HTML'
-        send_resolved: true
-        api_url: 'https://api.telegram.org'
-    email_configs:
-      - to: 'oncall@example.com'
-        send_resolved: true
-        headers:
-          Subject: '[CRITICAL {{ .Status | toUpper }}] {{ .CommonAnnotations.summary }}'
-        html: '{{ template "email.html" . }}'
-        require_tls: true
-
-  - name: 'emergency'
-    discord_configs:
-      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
-        title: '{{ template "discord.title" . }}'
-        message: '{{ template "discord.message" . }}'
-        send_resolved: true
-    telegram_configs:
-      - bot_token: '0000000000:CHANGE_ME_TELEGRAM_BOT_TOKEN'
-        chat_id: 0
-        message: '{{ template "telegram.message" . }}'
-        parse_mode: 'HTML'
-        send_resolved: true
-        api_url: 'https://api.telegram.org'
-        disable_notifications: false
-    email_configs:
-      - to: 'oncall@example.com'
-        send_resolved: true
-        headers:
-          Subject: '[EMERGENCY {{ .Status | toUpper }}] {{ .CommonAnnotations.summary }}'
-        html: '{{ template "email.html" . }}'
-        require_tls: true
-
-  - name: 'security'
-    discord_configs:
-      - webhook_url: 'https://discord.com/api/webhooks/CHANGE_ME/CHANGE_ME'
-        title: '{{ template "discord.title" . }}'
-        message: '{{ template "discord.message" . }}'
-        send_resolved: true
-    telegram_configs:
-      - bot_token: '0000000000:CHANGE_ME_TELEGRAM_BOT_TOKEN'
-        chat_id: 0
-        message: '{{ template "telegram.message" . }}'
-        parse_mode: 'HTML'
-        send_resolved: true
-        api_url: 'https://api.telegram.org'
-
   - name: 'null'

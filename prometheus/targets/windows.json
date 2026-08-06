@@ -1,13 +1,1 @@
-[
-  {
-    "targets": [
-      "windows-host.example.com:9182"
-    ],
-    "labels": {
-      "env": "production",
-      "os": "windows",
-      "role": "server",
-      "component": "windows"
-    }
-  }
-]
+[]

@@ -1,14 +1,1 @@
-[
-  {
-    "targets": [
-      "pve1.example.com:8006"
-    ],
-    "labels": {
-      "env": "production",
-      "site": "dc1",
-      "role": "hypervisor",
-      "component": "proxmox",
-      "cluster": "pve-lab"
-    }
-  }
-]
+[]

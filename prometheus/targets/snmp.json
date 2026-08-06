@@ -1,13 +1,1 @@
-[
-  {
-    "targets": [
-      "192.168.1.1"
-    ],
-    "labels": {
-      "env": "production",
-      "component": "snmp",
-      "device": "gateway",
-      "module": "if_mib"
-    }
-  }
-]
+[]
