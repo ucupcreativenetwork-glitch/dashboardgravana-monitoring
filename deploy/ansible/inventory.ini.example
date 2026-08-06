@@ -1,0 +1,5 @@
+[monitoring_agents]
+# 10.0.0.11 ansible_user=ubuntu
+
+[monitoring_agents:vars]
+node_exporter_version=1.8.2

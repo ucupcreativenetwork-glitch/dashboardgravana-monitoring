@@ -1,0 +1,1 @@
+DashboardGravana Helm skeleton. Set grafana.adminPassword via Secret.

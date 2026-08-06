@@ -1,0 +1,12 @@
+replicaCount: 1
+grafana:
+  enabled: true
+  image: grafana/grafana:11.2.0
+  adminPassword: ""
+prometheus:
+  enabled: true
+  image: prom/prometheus:v2.54.1
+  retention: 30d
+ingress:
+  enabled: false
+  host: monitoring.example.com
